@@ -11,7 +11,7 @@ from pathlib import Path
 
 from web.backend.engine import SearchLimit, parse_info
 from web.backend.server import XiangqiHandler
-from web.backend.xiangqi import board_after, legal_moves, move_rows, moves_to_chinese, side_to_move, validate_legal_sequence
+from web.backend.xiangqi import Piece, board_after, is_in_check, legal_moves, move_rows, moves_to_chinese, side_to_move, validate_legal_sequence
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,6 +44,17 @@ class XiangqiCoreTest(unittest.TestCase):
         validate_legal_sequence(["h2e2", "h9g7"])
         with self.assertRaises(ValueError):
             validate_legal_sequence(["h2h0"])
+
+    def test_legal_moves_filter_flying_general_check(self) -> None:
+        board = {
+            "e0": Piece("red", "king"),
+            "e9": Piece("black", "king"),
+        }
+        self.assertTrue(is_in_check(board, "red"))
+        moves = legal_moves(board, "red")
+        self.assertIn("e0d0", moves)
+        self.assertIn("e0f0", moves)
+        self.assertNotIn("e0e1", moves)
 
 
 class EngineParsingTest(unittest.TestCase):

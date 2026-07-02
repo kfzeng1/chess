@@ -238,12 +238,35 @@ def legal_moves_for_piece(board: dict[str, Piece], square: str) -> list[str]:
     return []
 
 
-def legal_moves(board: dict[str, Piece], side: str) -> list[str]:
+def pseudo_legal_moves(board: dict[str, Piece], side: str) -> list[str]:
     result: list[str] = []
     for square, piece in board.items():
         if piece.side == side:
             result.extend(legal_moves_for_piece(board, square))
     return sorted(result)
+
+
+def legal_moves(board: dict[str, Piece], side: str) -> list[str]:
+    result: list[str] = []
+    for move in pseudo_legal_moves(board, side):
+        next_board = dict(board)
+        apply_move(next_board, move)
+        if not is_in_check(next_board, side):
+            result.append(move)
+    return sorted(result)
+
+
+def is_in_check(board: dict[str, Piece], side: str) -> bool:
+    king_square = None
+    for square, piece in board.items():
+        if piece.side == side and piece.role == "king":
+            king_square = square
+            break
+    if king_square is None:
+        return True
+
+    enemy = "black" if side == "red" else "red"
+    return any(move[2:] == king_square for move in pseudo_legal_moves(board, enemy))
 
 
 def validate_legal_sequence(moves: list[str]) -> None:

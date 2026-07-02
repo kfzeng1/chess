@@ -94,6 +94,10 @@ The tests cover:
 
 ## Current Limitations
 
-- The current board interaction validates piece ownership and board state, but it does not yet enforce all Xiangqi move legality rules in the frontend.
-- Chinese notation handles normal single-piece notation. Ambiguous same-file piece notation can be refined later.
-- Mobile migration should reuse the backend API and the same board coordinate model.
+- Legal move generation covers piece movement, blocking, palace/river limits,
+  flying general, and self-check filtering. Tournament rules such as repetition
+  and perpetual chase/check are not implemented yet.
+- Chinese notation handles normal single-piece notation. Ambiguous same-file
+  piece notation can be refined later.
+- Mobile migration should reuse the backend API and the same board coordinate
+  model.
