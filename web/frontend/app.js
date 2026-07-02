@@ -325,7 +325,7 @@ function bindControls() {
   });
   el.manualAi.addEventListener("click", () => playAiMove().catch(showError));
   el.delayRange.addEventListener("input", () => {
-    el.delayLabel.textContent = `${Number(el.delayRange.value).toFixed(1)}s 后判断`;
+    el.delayLabel.textContent = `${Number(el.delayRange.value).toFixed(1)}s 最小间隔`;
     scheduleAuto();
   });
   document.querySelectorAll(".segmented").forEach((segmented) => {

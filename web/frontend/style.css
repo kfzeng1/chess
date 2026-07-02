@@ -127,11 +127,11 @@ button, input { font: inherit; }
 .piece { width: 6.65%; aspect-ratio: 1; filter: drop-shadow(0 4px 4px rgba(41,25,13,0.25)); cursor: pointer; }
 .piece.last-from { border-radius: 50%; outline: 3px solid rgba(168,107,37,0.88); outline-offset: 4px; }
 .piece.last-to, .piece.selected { border-radius: 50%; outline: 3px solid rgba(40,127,131,0.88); outline-offset: 4px; }
-.square-target { width: 7.4%; aspect-ratio: 1; border-radius: 50%; border: 0; background: transparent; cursor: pointer; }
+.square-target { width: 10%; aspect-ratio: 1; border-radius: 50%; border: 0; background: transparent; cursor: pointer; }
 .hint {
   position: absolute; width: 2.6%; aspect-ratio: 1; border-radius: 50%; background: rgba(40,127,131,0.82);
   left: calc((278 + var(--f) * 156) / 1800 * 100%); top: calc((298 + (9 - var(--r)) * 156) / 2000 * 100%);
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%); pointer-events: none;
 }
 .analysis { display: grid; grid-template-rows: auto auto auto auto 1fr; gap: 12px; min-height: 0; }
 .notation-control { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 12px; }
