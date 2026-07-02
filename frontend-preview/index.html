@@ -23,6 +23,10 @@
         box-sizing: border-box;
       }
 
+      [hidden] {
+        display: none !important;
+      }
+
       body {
         margin: 0;
         min-height: 100vh;
@@ -107,7 +111,7 @@
 
       .workspace {
         display: grid;
-        grid-template-columns: 250px minmax(720px, 1fr) 340px;
+        grid-template-columns: 280px minmax(700px, 1fr) 360px;
         gap: 16px;
         padding: 16px;
         min-height: 0;
@@ -123,7 +127,7 @@
 
       .panel {
         min-height: 0;
-        overflow: hidden;
+        overflow: auto;
       }
 
       .panel-header {
@@ -157,6 +161,19 @@
         gap: 8px;
       }
 
+      .tool-item {
+        display: grid;
+        gap: 5px;
+      }
+
+      .tool-label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1;
+        text-align: center;
+      }
+
       .icon-btn,
       .cmd-btn {
         height: 36px;
@@ -168,10 +185,11 @@
         align-items: center;
         justify-content: center;
         gap: 8px;
-        cursor: default;
+        cursor: pointer;
       }
 
       .icon-btn {
+        width: 100%;
         font-size: 17px;
       }
 
@@ -181,10 +199,23 @@
         color: white;
       }
 
+      .cmd-btn.primary.is-off {
+        border-color: var(--line);
+        background: #fffdf8;
+        color: var(--text);
+      }
+
       .cmd-btn.teal {
         border-color: #1d6b70;
         background: var(--teal);
         color: white;
+      }
+
+      .cmd-btn:disabled {
+        border-color: #ded5c8;
+        background: #eee8df;
+        color: #9a8f82;
+        cursor: not-allowed;
       }
 
       .segmented {
@@ -196,17 +227,22 @@
         background: var(--surface-2);
       }
 
-      .segmented span {
+      .segmented button,
+      .notation-tabs button {
         height: 30px;
+        border: 0;
         display: grid;
         place-items: center;
         border-radius: 6px;
+        background: transparent;
         color: var(--muted);
         font-size: 13px;
         font-weight: 650;
+        cursor: pointer;
       }
 
-      .segmented .active-red {
+      .segmented .active-red,
+      .notation-tabs .active-red {
         background: var(--red);
         color: #fff;
       }
@@ -214,6 +250,83 @@
       .segmented .active-black {
         background: var(--black);
         color: #fff;
+      }
+
+      .delay-control {
+        padding: 10px;
+        border: 1px solid #e2d9ce;
+        border-radius: 7px;
+        background: #fffdf8;
+        display: grid;
+        gap: 9px;
+      }
+
+      .delay-control input {
+        width: 100%;
+        accent-color: var(--teal);
+      }
+
+      .ai-card {
+        padding: 10px;
+        border: 1px solid #e2d9ce;
+        border-radius: 7px;
+        background: #fffdf8;
+        display: grid;
+        gap: 9px;
+      }
+
+      .mode-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        padding: 3px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface-2);
+      }
+
+      .mode-tabs button {
+        height: 28px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .mode-tabs .active-red {
+        background: var(--red);
+        color: #fff;
+      }
+
+      .mode-tabs .active-black {
+        background: var(--black);
+        color: #fff;
+      }
+
+      .search-slider {
+        width: 100%;
+      }
+
+      .search-slider.red {
+        accent-color: var(--red);
+      }
+
+      .search-slider.black {
+        accent-color: var(--black);
+      }
+
+      .uci-command {
+        padding: 6px 8px;
+        border-radius: 6px;
+        background: var(--surface-2);
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 11px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .field {
@@ -371,6 +484,38 @@
         color: white;
       }
 
+      .board-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 14px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+
+      .legend-dot.from {
+        border: 2px solid var(--amber);
+      }
+
+      .legend-dot.to {
+        border: 2px solid var(--teal);
+      }
+
+      .legend-dot.move {
+        background: var(--teal);
+      }
+
       .board-stage {
         min-height: 0;
         display: grid;
@@ -400,29 +545,45 @@
         filter: drop-shadow(0 4px 4px rgba(41, 25, 13, 0.25));
       }
 
-      .piece.last-from,
+      .piece.last-from {
+        border-radius: 50%;
+        outline: 3px solid rgba(168, 107, 37, 0.88);
+        outline-offset: 4px;
+      }
+
       .piece.last-to {
         border-radius: 50%;
-        outline: 3px solid rgba(40, 127, 131, 0.72);
+        outline: 3px solid rgba(40, 127, 131, 0.88);
         outline-offset: 4px;
       }
 
       .hint {
         position: absolute;
-        width: 2.2%;
+        width: 2.6%;
         aspect-ratio: 1;
         left: calc((278 + var(--f) * 156) / 1800 * 100%);
         top: calc((298 + (9 - var(--r)) * 156) / 2000 * 100%);
         transform: translate(-50%, -50%);
         border-radius: 50%;
-        background: rgba(40, 127, 131, 0.62);
+        border: 2px solid rgba(251, 250, 247, 0.86);
+        background: rgba(40, 127, 131, 0.82);
+        box-shadow: 0 2px 4px rgba(41, 25, 13, 0.18);
       }
 
       .analysis {
         display: grid;
-        grid-template-rows: auto auto 1fr;
+        grid-template-rows: auto auto auto auto 1fr;
         gap: 12px;
         min-height: 0;
+      }
+
+      .notation-control {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 12px;
       }
 
       .engine-row {
@@ -454,6 +615,16 @@
 
       .move-chip.black {
         color: var(--black);
+      }
+
+      .engine-note {
+        padding: 10px;
+        border: 1px solid #e2d9ce;
+        border-radius: 7px;
+        background: #fffdf8;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.55;
       }
 
       .recommendations {
@@ -521,6 +692,28 @@
 
       .history {
         min-height: 0;
+      }
+
+      .history-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .history-head .engine-row {
+        flex: 1;
+      }
+
+      .notation-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        width: 112px;
+        padding: 3px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface-2);
       }
 
       .moves {
@@ -620,37 +813,68 @@
           </div>
           <div class="panel-body stack">
             <div class="toolbar">
-              <button class="icon-btn" title="新局">↻</button>
-              <button class="icon-btn" title="悔棋">↶</button>
-              <button class="icon-btn" title="翻转">⇅</button>
+              <div class="tool-item">
+                <div class="tool-label">新局</div>
+                <button class="icon-btn" title="新局">↻</button>
+              </div>
+              <div class="tool-item">
+                <div class="tool-label">悔棋</div>
+                <button class="icon-btn" title="撤销红方或黑方的一步">↶</button>
+              </div>
+              <div class="tool-item">
+                <div class="tool-label">翻转</div>
+                <button class="icon-btn" title="翻转棋盘">⇅</button>
+              </div>
             </div>
 
-            <button class="cmd-btn primary">红方走棋</button>
-            <button class="cmd-btn teal">AI 计算一步</button>
+            <button class="cmd-btn primary" id="autoModeButton" type="button" aria-pressed="true">自动模式：开</button>
 
-            <div class="field">
-              <div class="field-row"><strong>红方</strong><span>Human</span></div>
-              <div class="segmented"><span class="active-red">人类</span><span>AI</span></div>
-            </div>
-
-            <div class="field">
-              <div class="field-row"><strong>黑方</strong><span>Pikafish</span></div>
-              <div class="segmented"><span>人类</span><span class="active-black">AI</span></div>
-            </div>
-
-            <div class="field">
-              <div class="field-row"><strong>红方 AI 强度</strong><span>depth 12</span></div>
-              <div class="slider red"><i></i></div>
+            <div class="delay-control">
+              <div class="field-row"><strong>AI 间隔</strong><span id="delayValue">2.0s 后判断</span></div>
+              <input id="delayRange" type="range" min="0" max="5" step="0.5" value="2" aria-label="连续 AI 调用间隔">
             </div>
 
             <div class="field">
-              <div class="field-row"><strong>黑方 AI 强度</strong><span>depth 16</span></div>
-              <div class="slider black"><i></i></div>
+              <div class="field-row"><strong>红方</strong><span id="redSideLabel">Human</span></div>
+              <div class="segmented" data-side="red">
+                <button class="active-red" type="button" data-player="human">人类</button>
+                <button type="button" data-player="ai">AI</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <div class="field-row"><strong>黑方</strong><span id="blackSideLabel">Pikafish</span></div>
+              <div class="segmented" data-side="black">
+                <button type="button" data-player="human">人类</button>
+                <button class="active-black" type="button" data-player="ai">AI</button>
+              </div>
+            </div>
+
+            <button class="cmd-btn teal" id="manualAiButton" type="button" title="当前执棋方为人类时，可让 AI 代走当前这一步">本步 AI</button>
+
+            <div class="ai-card" data-ai-strength="red">
+              <div class="field-row"><strong>红方 AI 搜索</strong><span data-ai-label="red">每步 1.0s</span></div>
+              <div class="mode-tabs" data-ai-mode-tabs="red">
+                <button class="active-red" type="button" data-ai-mode="movetime">时间</button>
+                <button type="button" data-ai-mode="depth">深度</button>
+              </div>
+              <input class="search-slider red" data-ai-range="red" type="range" min="0.1" max="30" step="0.1" value="1" aria-label="红方 AI 搜索限制">
+              <div class="uci-command" data-ai-command="red">go movetime 1000</div>
+            </div>
+
+            <div class="ai-card" data-ai-strength="black">
+              <div class="field-row"><strong>黑方 AI 搜索</strong><span data-ai-label="black">depth 16</span></div>
+              <div class="mode-tabs" data-ai-mode-tabs="black">
+                <button type="button" data-ai-mode="movetime">时间</button>
+                <button class="active-black" type="button" data-ai-mode="depth">深度</button>
+              </div>
+              <input class="search-slider black" data-ai-range="black" type="range" min="1" max="30" step="1" value="16" aria-label="黑方 AI 搜索限制">
+              <div class="uci-command" data-ai-command="black">go depth 16</div>
             </div>
 
             <div class="status-grid">
-              <div class="stat"><span>回合</span><strong>红方</strong></div>
-              <div class="stat"><span>手数</span><strong>18</strong></div>
+              <div class="stat"><span>当前方</span><strong>红方</strong></div>
+              <div class="stat"><span>回合数</span><strong>18</strong></div>
               <div class="stat"><span>红方用时</span><strong>05:42</strong></div>
               <div class="stat"><span>黑方用时</span><strong>04:58</strong></div>
             </div>
@@ -667,9 +891,14 @@
               </div>
             </div>
             <div class="wdl" aria-label="WDL">
-              <div class="w">胜 8%</div>
+              <div class="w">红胜 8%</div>
               <div class="d">和 90%</div>
-              <div class="l">负 2%</div>
+              <div class="l">黑胜 2%</div>
+            </div>
+            <div class="board-legend" aria-label="棋盘标记">
+              <span class="legend-item"><i class="legend-dot from"></i>起点</span>
+              <span class="legend-item"><i class="legend-dot to"></i>终点</span>
+              <span class="legend-item"><i class="legend-dot move"></i>可走</span>
             </div>
           </div>
           <div class="board-stage">
@@ -722,9 +951,25 @@
             <span style="color: var(--muted); font-size: 12px;">849k nodes</span>
           </div>
           <div class="panel-body analysis">
+            <section class="notation-control">
+              <span>着法显示</span>
+              <div class="notation-tabs" aria-label="AI 分析着法显示模式">
+                <button class="active-red" type="button" data-history-mode="cn">中文</button>
+                <button type="button" data-history-mode="uci">UCI</button>
+              </div>
+            </section>
+
             <section class="stack">
               <div class="engine-row"><span>主变</span><span>depth 17 / nps 849k</span></div>
-              <div class="pv">
+              <div class="pv" data-notation="cn">
+                <span class="move-chip red">兵七进一</span>
+                <span class="move-chip black">炮2平7</span>
+                <span class="move-chip red">炮二平五</span>
+                <span class="move-chip black">象7进5</span>
+                <span class="move-chip red">马八进七</span>
+                <span class="move-chip black">马2进3</span>
+              </div>
+              <div class="pv" data-notation="uci" hidden>
                 <span class="move-chip red">c3c4</span>
                 <span class="move-chip black">b7c7</span>
                 <span class="move-chip red">h2e2</span>
@@ -736,38 +981,78 @@
 
             <section class="stack">
               <div class="engine-row"><span>推荐着法</span><span>MultiPV 5</span></div>
-              <div class="recommendations">
+              <div class="recommendations" data-notation="cn">
+                <div class="rec best">
+                  <div class="rank">1</div>
+                  <div class="rec-main"><strong>兵七进一</strong><span>主变 兵七进一 炮2平7 炮二平五</span></div>
+                  <div class="eval"><strong>红方 +0.24</strong><span>WDL 64/923/13</span></div>
+                </div>
+                <div class="rec">
+                  <div class="rank">2</div>
+                  <div class="rec-main"><strong>兵三进一</strong><span>主变 兵三进一 炮8平7 炮二平五</span></div>
+                  <div class="eval"><strong>红方 +0.21</strong><span>WDL 59/927/14</span></div>
+                </div>
+                <div class="rec">
+                  <div class="rank">3</div>
+                  <div class="rec-main"><strong>炮八平五</strong><span>主变 炮八平五 马2进3 马八进七</span></div>
+                  <div class="eval"><strong>红方 +0.18</strong><span>WDL 55/930/15</span></div>
+                </div>
+                <div class="rec">
+                  <div class="rank">4</div>
+                  <div class="rec-main"><strong>炮二平五</strong><span>主变 炮二平五 马8进7 兵七进一</span></div>
+                  <div class="eval"><strong>红方 +0.16</strong><span>WDL 51/932/17</span></div>
+                </div>
+                <div class="rec">
+                  <div class="rank">5</div>
+                  <div class="rec-main"><strong>马八进七</strong><span>主变 马八进七 卒3进1 兵三进一</span></div>
+                  <div class="eval"><strong>红方 +0.12</strong><span>WDL 47/934/19</span></div>
+                </div>
+              </div>
+              <div class="recommendations" data-notation="uci" hidden>
                 <div class="rec best">
                   <div class="rank">1</div>
                   <div class="rec-main"><strong>c3c4</strong><span>pv c3c4 b7c7 h2e2</span></div>
-                  <div class="eval"><strong>+0.24</strong><span>WDL 64/923/13</span></div>
+                  <div class="eval"><strong>红方 +0.24</strong><span>WDL 64/923/13</span></div>
                 </div>
                 <div class="rec">
                   <div class="rank">2</div>
                   <div class="rec-main"><strong>g3g4</strong><span>pv g3g4 h7g7 b2e2</span></div>
-                  <div class="eval"><strong>+0.21</strong><span>WDL 59/927/14</span></div>
+                  <div class="eval"><strong>红方 +0.21</strong><span>WDL 59/927/14</span></div>
                 </div>
                 <div class="rec">
                   <div class="rank">3</div>
                   <div class="rec-main"><strong>b2e2</strong><span>pv b2e2 b9c7 b0c2</span></div>
-                  <div class="eval"><strong>+0.18</strong><span>WDL 55/930/15</span></div>
+                  <div class="eval"><strong>红方 +0.18</strong><span>WDL 55/930/15</span></div>
                 </div>
                 <div class="rec">
                   <div class="rank">4</div>
                   <div class="rec-main"><strong>h2e2</strong><span>pv h2e2 h9g7 c3c4</span></div>
-                  <div class="eval"><strong>+0.16</strong><span>WDL 51/932/17</span></div>
+                  <div class="eval"><strong>红方 +0.16</strong><span>WDL 51/932/17</span></div>
                 </div>
                 <div class="rec">
                   <div class="rank">5</div>
                   <div class="rec-main"><strong>b0c2</strong><span>pv b0c2 c6c5 g3g4</span></div>
-                  <div class="eval"><strong>+0.12</strong><span>WDL 47/934/19</span></div>
+                  <div class="eval"><strong>红方 +0.12</strong><span>WDL 47/934/19</span></div>
                 </div>
               </div>
             </section>
 
+            <section class="engine-note">
+              bestmove 是引擎建议的当前一步；pv 是按该步继续推演的主变。中文模式展示给用户看的象棋记谱，UCI 模式展示引擎坐标。MultiPV 5 表示同时返回 5 个候选首步。score 正数为红方优势，WDL 依次为红胜、和棋、黑胜的千分估计。
+            </section>
+
             <section class="history">
-              <div class="engine-row" style="margin-bottom: 10px;"><span>走法记录</span><span>UCI</span></div>
-              <div class="moves">
+              <div class="history-head">
+                <div class="engine-row"><span>走法记录</span><span id="historyModeLabel">中文</span></div>
+              </div>
+              <div class="moves" data-notation="cn">
+                <span class="num">1.</span><span class="red">炮二平五</span><span class="black">马8进7</span>
+                <span class="num">2.</span><span class="red">马二进三</span><span class="black">车9平8</span>
+                <span class="num">3.</span><span class="red">车一平二</span><span class="black">马2进3</span>
+                <span class="num">4.</span><span class="red">兵七进一</span><span class="black">炮2平8</span>
+                <span class="num">5.</span><span class="red">马八进七</span><span class="black">象7进5</span>
+              </div>
+              <div class="moves" data-notation="uci" hidden>
                 <span class="num">1.</span><span class="red">h2e2</span><span class="black">h9g7</span>
                 <span class="num">2.</span><span class="red">h0g2</span><span class="black">i9h9</span>
                 <span class="num">3.</span><span class="red">i0h0</span><span class="black">b9c7</span>
@@ -779,5 +1064,141 @@
         </aside>
       </main>
     </div>
+    <script>
+      const autoModeButton = document.getElementById("autoModeButton");
+      const manualAiButton = document.getElementById("manualAiButton");
+      const delayRange = document.getElementById("delayRange");
+      const delayValue = document.getElementById("delayValue");
+      const redSideLabel = document.getElementById("redSideLabel");
+      const blackSideLabel = document.getElementById("blackSideLabel");
+      const historyModeLabel = document.getElementById("historyModeLabel");
+      const currentTurn = "red";
+      const players = {
+        red: "human",
+        black: "ai",
+      };
+      const aiSearch = {
+        red: {
+          mode: "movetime",
+          movetime: 1,
+          depth: 12,
+        },
+        black: {
+          mode: "depth",
+          movetime: 2,
+          depth: 16,
+        },
+      };
+
+      function updateAiSearch(side) {
+        const config = aiSearch[side];
+        const label = document.querySelector(`[data-ai-label="${side}"]`);
+        const range = document.querySelector(`[data-ai-range="${side}"]`);
+        const command = document.querySelector(`[data-ai-command="${side}"]`);
+        const modeButtons = document.querySelectorAll(`[data-ai-mode-tabs="${side}"] button`);
+
+        modeButtons.forEach((button) => {
+          const isActive = button.dataset.aiMode === config.mode;
+          button.classList.toggle(side === "red" ? "active-red" : "active-black", isActive);
+        });
+
+        if (config.mode === "movetime") {
+          range.min = "0.1";
+          range.max = "30";
+          range.step = "0.1";
+          range.value = String(config.movetime);
+          label.textContent = `每步 ${config.movetime.toFixed(1)}s`;
+          command.textContent = `go movetime ${Math.round(config.movetime * 1000)}`;
+        } else {
+          range.min = "1";
+          range.max = "30";
+          range.step = "1";
+          range.value = String(config.depth);
+          label.textContent = `depth ${config.depth}`;
+          command.textContent = `go depth ${config.depth}`;
+        }
+      }
+
+      function updateManualAiButton() {
+        const currentPlayer = players[currentTurn];
+        manualAiButton.disabled = currentPlayer !== "human";
+      }
+
+      autoModeButton.addEventListener("click", () => {
+        const isAuto = autoModeButton.getAttribute("aria-pressed") === "true";
+        autoModeButton.setAttribute("aria-pressed", String(!isAuto));
+        autoModeButton.textContent = isAuto ? "自动模式：关" : "自动模式：开";
+        autoModeButton.classList.toggle("is-off", isAuto);
+        updateManualAiButton();
+      });
+
+      delayRange.addEventListener("input", () => {
+        delayValue.textContent = `${Number(delayRange.value).toFixed(1)}s 后判断`;
+      });
+
+      document.querySelectorAll(".segmented").forEach((segmented) => {
+        segmented.addEventListener("click", (event) => {
+          const button = event.target.closest("button");
+          if (!button) return;
+
+          const side = segmented.dataset.side;
+          const player = button.dataset.player;
+          players[side] = player;
+
+          segmented.querySelectorAll("button").forEach((item) => {
+            item.classList.remove("active-red", "active-black");
+          });
+          button.classList.add(side === "red" ? "active-red" : "active-black");
+
+          if (side === "red") {
+            redSideLabel.textContent = player === "human" ? "Human" : "Pikafish";
+          } else {
+            blackSideLabel.textContent = player === "human" ? "Human" : "Pikafish";
+          }
+
+          updateManualAiButton();
+        });
+      });
+
+      document.querySelectorAll("[data-ai-mode-tabs]").forEach((tabs) => {
+        tabs.addEventListener("click", (event) => {
+          const button = event.target.closest("button");
+          if (!button) return;
+          const side = tabs.dataset.aiModeTabs;
+          aiSearch[side].mode = button.dataset.aiMode;
+          updateAiSearch(side);
+        });
+      });
+
+      document.querySelectorAll("[data-ai-range]").forEach((range) => {
+        range.addEventListener("input", () => {
+          const side = range.dataset.aiRange;
+          const config = aiSearch[side];
+          if (config.mode === "movetime") {
+            config.movetime = Number(range.value);
+          } else {
+            config.depth = Number(range.value);
+          }
+          updateAiSearch(side);
+        });
+      });
+
+      document.querySelectorAll("[data-history-mode]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const mode = button.dataset.historyMode;
+          document.querySelectorAll("[data-history-mode]").forEach((item) => {
+            item.classList.toggle("active-red", item === button);
+          });
+          historyModeLabel.textContent = mode === "cn" ? "中文" : "UCI";
+          document.querySelectorAll("[data-notation]").forEach((item) => {
+            item.hidden = item.dataset.notation !== mode;
+          });
+        });
+      });
+
+      updateManualAiButton();
+      updateAiSearch("red");
+      updateAiSearch("black");
+    </script>
   </body>
 </html>
