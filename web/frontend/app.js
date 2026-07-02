@@ -21,6 +21,7 @@ const state = {
   analysisKey: "",
   clocks: { red: 0, black: 0 },
   lastClockTick: Date.now(),
+  generation: 0,
 };
 
 const el = {
@@ -218,8 +219,11 @@ async function syncPosition() {
 }
 
 async function movePiece(move) {
+  clearTimeout(state.autoTimer);
   const previousMoves = [...state.moves];
   const previousLastMove = state.lastMove;
+  const previousGeneration = state.generation;
+  state.generation += 1;
   state.moves.push(move);
   state.lastMove = move;
   state.selected = null;
@@ -232,6 +236,7 @@ async function movePiece(move) {
   } catch (error) {
     state.moves = previousMoves;
     state.lastMove = previousLastMove;
+    state.generation = previousGeneration + 1;
     state.selected = null;
     await syncPosition();
     throw error;
@@ -280,10 +285,11 @@ async function refreshAnalysis() {
   const key = movesKey();
   const movesSnapshot = [...state.moves];
   const sideSnapshot = state.sideToMove;
+  const generationSnapshot = state.generation;
   el.thinking.textContent = "思考中";
   el.engineStatus.textContent = "Pikafish thinking";
   const data = await api("/api/analyze", { moves: movesSnapshot, limit: currentLimit(sideSnapshot), multipv: 5 });
-  if (key !== movesKey()) {
+  if (key !== movesKey() || generationSnapshot !== state.generation) {
     return false;
   }
   state.analysis = data;
@@ -296,10 +302,12 @@ async function refreshAnalysis() {
 
 async function playAiMove() {
   if (state.gameOver) return;
+  const generationSnapshot = state.generation;
   if (!state.analysis || state.analysisKey !== movesKey()) {
     const refreshed = await refreshAnalysis();
     if (!refreshed) return;
   }
+  if (generationSnapshot !== state.generation) return;
   if (state.analysis?.bestmove && state.legalMoves.includes(state.analysis.bestmove)) {
     await movePiece(state.analysis.bestmove);
   } else if (state.analysis?.bestmove) {
@@ -317,8 +325,10 @@ function scheduleAuto() {
   if (state.gameOver) return;
   if (!state.autoMode || state.players[state.sideToMove] !== "ai") return;
   const delay = Number(el.delayRange.value) * 1000;
+  const generationSnapshot = state.generation;
+  const sideSnapshot = state.sideToMove;
   state.autoTimer = setTimeout(() => {
-    if (state.autoMode && state.players[state.sideToMove] === "ai") {
+    if (generationSnapshot === state.generation && sideSnapshot === state.sideToMove && state.autoMode && state.players[state.sideToMove] === "ai") {
       playAiMove().catch(showError);
     }
   }, delay);
@@ -351,6 +361,8 @@ function showError(error) {
 
 function bindControls() {
   document.getElementById("newGame").addEventListener("click", () => {
+    clearTimeout(state.autoTimer);
+    state.generation += 1;
     state.moves = [];
     state.selected = null;
     state.lastMove = null;
@@ -361,6 +373,8 @@ function bindControls() {
     syncPosition().then(() => refreshAnalysis()).then(() => scheduleAuto()).catch(showError);
   });
   document.getElementById("undoMove").addEventListener("click", () => {
+    clearTimeout(state.autoTimer);
+    state.generation += 1;
     state.moves.pop();
     state.lastMove = state.moves.at(-1) || null;
     state.analysis = null;
