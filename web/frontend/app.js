@@ -19,6 +19,8 @@ const state = {
   analysis: null,
   autoTimer: null,
   analysisKey: "",
+  clocks: { red: 0, black: 0 },
+  lastClockTick: Date.now(),
 };
 
 const el = {
@@ -26,6 +28,8 @@ const el = {
   turnText: document.getElementById("turnText"),
   turnStat: document.getElementById("turnStat"),
   roundStat: document.getElementById("roundStat"),
+  redClock: document.getElementById("redClock"),
+  blackClock: document.getElementById("blackClock"),
   moveCount: document.getElementById("moveCount"),
   thinking: document.getElementById("thinking"),
   redLabel: document.getElementById("redLabel"),
@@ -129,6 +133,29 @@ function renderStatus() {
   el.redLabel.textContent = state.players.red === "human" ? "Human" : "Pikafish";
   el.blackLabel.textContent = state.players.black === "human" ? "Human" : "Pikafish";
   el.manualAi.disabled = state.gameOver;
+  renderClocks();
+}
+
+function formatClock(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function renderClocks() {
+  el.redClock.textContent = formatClock(state.clocks.red);
+  el.blackClock.textContent = formatClock(state.clocks.black);
+}
+
+function tickClock() {
+  const now = Date.now();
+  const elapsed = now - state.lastClockTick;
+  state.lastClockTick = now;
+  if (!state.gameOver) {
+    state.clocks[state.sideToMove] += elapsed;
+    renderClocks();
+  }
 }
 
 function renderHistory(positionData) {
@@ -329,6 +356,8 @@ function bindControls() {
     state.lastMove = null;
     state.analysis = null;
     state.analysisKey = "";
+    state.clocks = { red: 0, black: 0 };
+    state.lastClockTick = Date.now();
     syncPosition().then(() => refreshAnalysis()).then(() => scheduleAuto()).catch(showError);
   });
   document.getElementById("undoMove").addEventListener("click", () => {
@@ -397,6 +426,7 @@ function bindControls() {
 bindControls();
 updateAiSearch("red");
 updateAiSearch("black");
+setInterval(tickClock, 500);
 syncPosition().then(() => refreshAnalysis()).then(() => scheduleAuto()).catch(showError);
 
 if ("serviceWorker" in navigator) {
