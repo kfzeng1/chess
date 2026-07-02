@@ -91,8 +91,9 @@ Response includes:
 
 - Board pieces are rendered from `/api/position`.
 - Human moves are sent as UCI coordinates.
-- `本步 AI` asks Pikafish to play the current move for a human side.
-- `自动模式` waits the configured `AI 间隔`, then checks whether the current side is AI before calling Pikafish.
+- AI analysis refreshes after every move and is independent from move execution.
+- `本步 AI` uses the current analysis best move to play one move for the current side.
+- `自动代走` waits the configured `AI 间隔`, then checks whether the current side is AI before playing the current analysis best move.
 - AI search controls show the exact `go ...` command used by the backend.
 - AI analysis supports full-panel notation switching:
   - `中文`: user-facing Chinese move notation.

@@ -18,6 +18,7 @@ const state = {
   },
   analysis: null,
   autoTimer: null,
+  analysisKey: "",
 };
 
 const el = {
@@ -127,7 +128,7 @@ function renderStatus() {
   el.moveCount.textContent = `${state.moves.length} 步`;
   el.redLabel.textContent = state.players.red === "human" ? "Human" : "Pikafish";
   el.blackLabel.textContent = state.players.black === "human" ? "Human" : "Pikafish";
-  el.manualAi.disabled = state.players[state.sideToMove] !== "human";
+  el.manualAi.disabled = state.gameOver;
 }
 
 function renderHistory(positionData) {
@@ -187,15 +188,17 @@ async function syncPosition() {
   renderBoard();
   renderStatus();
   renderHistory(data);
-  scheduleAuto();
 }
 
-function movePiece(move) {
+async function movePiece(move) {
   state.moves.push(move);
   state.lastMove = move;
   state.selected = null;
   state.analysis = null;
-  return syncPosition();
+  state.analysisKey = "";
+  await syncPosition();
+  await refreshAnalysis();
+  scheduleAuto();
 }
 
 function handleSquareClick(square) {
@@ -226,16 +229,34 @@ function currentLimit() {
   };
 }
 
-async function analyze(applyBest = false) {
+function movesKey() {
+  return state.moves.join(" ");
+}
+
+async function refreshAnalysis() {
+  if (state.gameOver) {
+    state.analysis = null;
+    state.analysisKey = movesKey();
+    renderAnalysis();
+    return;
+  }
   el.thinking.textContent = "思考中";
   el.engineStatus.textContent = "Pikafish thinking";
   const data = await api("/api/analyze", { moves: state.moves, limit: currentLimit(), multipv: 5 });
   state.analysis = data;
+  state.analysisKey = movesKey();
   renderAnalysis();
   el.thinking.textContent = "待命";
   el.engineStatus.textContent = "Pikafish ready";
-  if (applyBest && data.bestmove) {
-    await movePiece(data.bestmove);
+}
+
+async function playAiMove() {
+  if (state.gameOver) return;
+  if (!state.analysis || state.analysisKey !== movesKey()) {
+    await refreshAnalysis();
+  }
+  if (state.analysis?.bestmove) {
+    await movePiece(state.analysis.bestmove);
   }
 }
 
@@ -246,7 +267,7 @@ function scheduleAuto() {
   const delay = Number(el.delayRange.value) * 1000;
   state.autoTimer = setTimeout(() => {
     if (state.autoMode && state.players[state.sideToMove] === "ai") {
-      analyze(true).catch(showError);
+      playAiMove().catch(showError);
     }
   }, delay);
 }
@@ -282,15 +303,15 @@ function bindControls() {
     state.selected = null;
     state.lastMove = null;
     state.analysis = null;
-    syncPosition().catch(showError);
-    renderAnalysis();
+    state.analysisKey = "";
+    syncPosition().then(() => refreshAnalysis()).then(() => scheduleAuto()).catch(showError);
   });
   document.getElementById("undoMove").addEventListener("click", () => {
     state.moves.pop();
     state.lastMove = state.moves.at(-1) || null;
     state.analysis = null;
-    syncPosition().catch(showError);
-    renderAnalysis();
+    state.analysisKey = "";
+    syncPosition().then(() => refreshAnalysis()).then(() => scheduleAuto()).catch(showError);
   });
   document.getElementById("flipBoard").addEventListener("click", () => {
     state.flipped = !state.flipped;
@@ -298,11 +319,11 @@ function bindControls() {
   });
   el.autoMode.addEventListener("click", () => {
     state.autoMode = !state.autoMode;
-    el.autoMode.textContent = state.autoMode ? "自动模式：开" : "自动模式：关";
+    el.autoMode.textContent = state.autoMode ? "自动代走：开" : "自动代走：关";
     el.autoMode.classList.toggle("is-off", !state.autoMode);
     scheduleAuto();
   });
-  el.manualAi.addEventListener("click", () => analyze(true).catch(showError));
+  el.manualAi.addEventListener("click", () => playAiMove().catch(showError));
   el.delayRange.addEventListener("input", () => {
     el.delayLabel.textContent = `${Number(el.delayRange.value).toFixed(1)}s 后判断`;
     scheduleAuto();
@@ -351,7 +372,7 @@ function bindControls() {
 bindControls();
 updateAiSearch("red");
 updateAiSearch("black");
-syncPosition().then(() => analyze(false)).catch(showError);
+syncPosition().then(() => refreshAnalysis()).then(() => scheduleAuto()).catch(showError);
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/service-worker.js").catch((error) => {
