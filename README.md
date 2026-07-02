@@ -1,7 +1,7 @@
 # Chinese Chess AI
 
-This repository contains the current frontend preview assets for a Xiangqi AI
-app and a local Pikafish engine build.
+This repository contains a runnable Xiangqi AI web app, board/piece assets, and
+a local Pikafish engine build.
 
 ## Structure
 
@@ -9,38 +9,57 @@ app and a local Pikafish engine build.
 assets/
   board.png              # latest board image
   pieces/*.png           # latest red/black piece images
-  ui-preview.png         # latest desktop frontend preview screenshot
+  ui-preview.png         # latest desktop web app screenshot
+docs/
+  WEB_APP.md             # web app API and run notes
 engines/
   pikafish-avxvnni       # Pikafish Linux x86-64 AVX-VNNI binary
   pikafish.nnue          # matching NNUE network
-frontend-preview/
-  index.html             # responsive UI preview
+tests/
+  test_backend.py
 tools/asset-generation/
   render_xiangqi_board.py
   render_xiangqi_pieces.py
+web/
+  backend/               # Python stdlib API server and Pikafish adapter
+  frontend/              # HTML/CSS/JS web app
 ```
 
-## Frontend Preview
+## Web App
 
-Run a local static server from the repository root:
+The runnable web app lives under `web/`.
 
 ```bash
-python3 -m http.server 8000
+python3 -m web.backend.server
 ```
 
 Open:
 
 ```text
-http://127.0.0.1:8000/frontend-preview/index.html
+http://127.0.0.1:8080/
+```
+
+Fast test mode without launching Pikafish:
+
+```bash
+XIANGQI_FAKE_ENGINE=1 python3 -m web.backend.server
 ```
 
 Refresh the desktop screenshot:
 
 ```bash
 npx playwright screenshot --viewport-size=1440,960 \
-  http://127.0.0.1:8000/frontend-preview/index.html \
+  http://127.0.0.1:8080/ \
   assets/ui-preview.png
 ```
+
+Run tests:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+More details: [docs/WEB_APP.md](docs/WEB_APP.md).
 
 ## Regenerate Assets
 
