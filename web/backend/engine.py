@@ -192,6 +192,13 @@ def get_engine() -> Pikafish:
     return _ENGINE
 
 
+def close_global_engine() -> None:
+    global _ENGINE
+    if _ENGINE is not None:
+        _ENGINE.close()
+        _ENGINE = None
+
+
 def fake_analysis(moves: list[str], multipv: int = 5) -> dict[str, Any]:
     board = board_after(moves)
     side = side_to_move(moves)

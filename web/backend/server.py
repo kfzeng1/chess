@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from .engine import SearchLimit, fake_analysis, get_engine
+from .engine import SearchLimit, close_global_engine, fake_analysis, get_engine
 from .xiangqi import START_BOARD, Piece, board_after, legal_moves, move_rows, moves_to_chinese, side_to_move, validate_legal_sequence, validate_move
 
 
@@ -165,6 +165,7 @@ def run(host: str = "127.0.0.1", port: int = 8080) -> None:
     try:
         httpd.serve_forever()
     finally:
+        close_global_engine()
         httpd.server_close()
 
 
