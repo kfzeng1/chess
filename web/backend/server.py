@@ -9,7 +9,7 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 from .engine import SearchLimit, close_global_engine, fake_analysis, get_engine
-from .xiangqi import START_BOARD, Piece, board_after, legal_moves, move_rows, moves_to_chinese, side_to_move, validate_legal_sequence, validate_move
+from .xiangqi import START_BOARD, Piece, board_after, is_in_check, legal_moves, move_rows, moves_to_chinese, side_to_move, validate_legal_sequence, validate_move
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -84,11 +84,14 @@ class XiangqiHandler(BaseHTTPRequestHandler):
 
     def handle_state(self) -> None:
         pieces = [piece_payload(square, piece) for square, piece in sorted(START_BOARD.items())]
+        initial_legal = legal_moves(dict(START_BOARD), "red")
         json_response(self, 200, {
             "pieces": pieces,
             "sideToMove": "red",
             "moves": [],
-            "legalMoves": legal_moves(dict(START_BOARD), "red"),
+            "legalMoves": initial_legal,
+            "gameOver": len(initial_legal) == 0,
+            "inCheck": False,
             "moveRows": [],
             "assets": {"board": "/assets/board.png"},
         })
@@ -106,12 +109,16 @@ class XiangqiHandler(BaseHTTPRequestHandler):
         validate_legal_sequence(moves)
         board = board_after(moves)
         turn = side_to_move(moves)
+        allowed = legal_moves(board, turn)
+        in_check = is_in_check(board, turn)
         pieces = [piece_payload(square, piece) for square, piece in sorted(board.items())]
         json_response(self, 200, {
             "pieces": pieces,
             "sideToMove": turn,
             "moves": moves,
-            "legalMoves": legal_moves(board, turn),
+            "legalMoves": allowed,
+            "gameOver": len(allowed) == 0,
+            "inCheck": in_check,
             "movesCn": moves_to_chinese(moves),
             "moveRowsCn": move_rows(moves, "cn"),
             "moveRowsUci": move_rows(moves, "uci"),

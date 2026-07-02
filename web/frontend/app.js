@@ -4,6 +4,8 @@ const state = {
   moves: [],
   sideToMove: "red",
   legalMoves: [],
+  gameOver: false,
+  inCheck: false,
   selected: null,
   lastMove: null,
   flipped: false,
@@ -115,7 +117,11 @@ function renderBoard() {
 }
 
 function renderStatus() {
-  el.turnText.textContent = `${sideName(state.sideToMove)}回合`;
+  if (state.gameOver) {
+    el.turnText.textContent = state.inCheck ? `${sideName(state.sideToMove)}将死` : `${sideName(state.sideToMove)}困毙`;
+  } else {
+    el.turnText.textContent = `${sideName(state.sideToMove)}回合`;
+  }
   el.turnStat.textContent = sideName(state.sideToMove);
   el.roundStat.textContent = String(state.moves.length);
   el.moveCount.textContent = `${state.moves.length} 步`;
@@ -176,6 +182,8 @@ async function syncPosition() {
   state.pieces = new Map(data.pieces.map((piece) => [piece.square, piece]));
   state.sideToMove = data.sideToMove;
   state.legalMoves = data.legalMoves || [];
+  state.gameOver = Boolean(data.gameOver);
+  state.inCheck = Boolean(data.inCheck);
   renderBoard();
   renderStatus();
   renderHistory(data);
@@ -233,6 +241,7 @@ async function analyze(applyBest = false) {
 
 function scheduleAuto() {
   clearTimeout(state.autoTimer);
+  if (state.gameOver) return;
   if (!state.autoMode || state.players[state.sideToMove] !== "ai") return;
   const delay = Number(el.delayRange.value) * 1000;
   state.autoTimer = setTimeout(() => {

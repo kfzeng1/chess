@@ -103,6 +103,7 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(data["sideToMove"], "red")
         self.assertEqual(len(data["pieces"]), 32)
+        self.assertFalse(data["gameOver"])
 
     def test_health_endpoint(self) -> None:
         status, data = self.request("GET", "/api/health")
@@ -133,6 +134,7 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(data["sideToMove"], "black")
         self.assertEqual(data["movesCn"], ["炮二平五"])
         self.assertIn("h9g7", data["legalMoves"])
+        self.assertFalse(data["gameOver"])
 
     def test_position_endpoint_rejects_illegal_history(self) -> None:
         status, data = self.request("POST", "/api/position", {"moves": ["h2h0"]})
