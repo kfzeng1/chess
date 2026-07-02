@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -41,6 +42,11 @@ def read_json(handler: BaseHTTPRequestHandler) -> dict[str, Any]:
         return {}
     raw = handler.rfile.read(length)
     return json.loads(raw.decode("utf-8"))
+
+
+def position_id(moves: list[str]) -> str:
+    raw = "\n".join(moves).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()[:16]
 
 
 class XiangqiHandler(BaseHTTPRequestHandler):
@@ -89,6 +95,7 @@ class XiangqiHandler(BaseHTTPRequestHandler):
             "pieces": pieces,
             "sideToMove": "red",
             "moves": [],
+            "positionId": position_id([]),
             "legalMoves": initial_legal,
             "gameOver": len(initial_legal) == 0,
             "inCheck": False,
@@ -107,6 +114,7 @@ class XiangqiHandler(BaseHTTPRequestHandler):
         payload = read_json(self)
         moves = normalize_moves(payload.get("moves", []))
         validate_legal_sequence(moves)
+        pos_id = position_id(moves)
         board = board_after(moves)
         turn = side_to_move(moves)
         allowed = legal_moves(board, turn)
@@ -116,6 +124,7 @@ class XiangqiHandler(BaseHTTPRequestHandler):
             "pieces": pieces,
             "sideToMove": turn,
             "moves": moves,
+            "positionId": pos_id,
             "legalMoves": allowed,
             "gameOver": len(allowed) == 0,
             "inCheck": in_check,
@@ -128,6 +137,10 @@ class XiangqiHandler(BaseHTTPRequestHandler):
         payload = read_json(self)
         moves = normalize_moves(payload.get("moves", []))
         validate_legal_sequence(moves)
+        pos_id = position_id(moves)
+        expected_position_id = payload.get("positionId")
+        if expected_position_id is not None and str(expected_position_id) != pos_id:
+            raise ValueError("positionId does not match moves")
         limit = SearchLimit.from_payload(payload.get("limit"))
         multipv = int(payload.get("multipv", 5))
         if os.environ.get("XIANGQI_FAKE_ENGINE") == "1":
@@ -136,6 +149,7 @@ class XiangqiHandler(BaseHTTPRequestHandler):
             analysis = get_engine().analyze(moves, limit, multipv)
         json_response(self, 200, {
             "sideToMove": side_to_move(moves),
+            "positionId": pos_id,
             "limit": {"mode": limit.mode, "value": limit.value, "command": "go " + " ".join(limit.go_args())},
             **analysis,
         })

@@ -63,6 +63,7 @@ Request:
 ```
 
 Returns the current pieces, side to move, Chinese move text, and UCI move rows.
+The response also includes `positionId`, a stable identity for the move list.
 
 ### `POST /api/analyze`
 
@@ -71,6 +72,7 @@ Request:
 ```json
 {
   "moves": ["h2e2"],
+  "positionId": "b1f...",
   "limit": { "mode": "movetime", "value": 1000 },
   "multipv": 5
 }
@@ -85,7 +87,12 @@ Response includes:
 
 - `bestmove`: UCI best move
 - `bestmove_cn`: Chinese notation for the best move
+- `positionId`: identity of the analyzed position
 - `lines`: MultiPV lines with score, WDL, UCI PV, and Chinese PV
+
+If `positionId` is provided and does not match `moves`, the backend rejects the
+request. Delegated moves should only be played when the analysis `positionId`
+matches the current position and the `bestmove` is present in `legalMoves`.
 
 ## Frontend Behavior
 

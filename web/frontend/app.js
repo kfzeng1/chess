@@ -6,6 +6,7 @@ const state = {
   legalMoves: [],
   gameOver: false,
   inCheck: false,
+  positionId: "",
   selected: null,
   lastMove: null,
   flipped: false,
@@ -210,6 +211,7 @@ async function syncPosition() {
   const data = await api("/api/position", { moves: state.moves });
   state.pieces = new Map(data.pieces.map((piece) => [piece.square, piece]));
   state.sideToMove = data.sideToMove;
+  state.positionId = data.positionId || "";
   state.legalMoves = data.legalMoves || [];
   state.gameOver = Boolean(data.gameOver);
   state.inCheck = Boolean(data.inCheck);
@@ -286,10 +288,11 @@ async function refreshAnalysis() {
   const movesSnapshot = [...state.moves];
   const sideSnapshot = state.sideToMove;
   const generationSnapshot = state.generation;
+  const positionIdSnapshot = state.positionId;
   el.thinking.textContent = "思考中";
   el.engineStatus.textContent = "Pikafish thinking";
-  const data = await api("/api/analyze", { moves: movesSnapshot, limit: currentLimit(sideSnapshot), multipv: 5 });
-  if (key !== movesKey() || generationSnapshot !== state.generation) {
+  const data = await api("/api/analyze", { moves: movesSnapshot, positionId: positionIdSnapshot, limit: currentLimit(sideSnapshot), multipv: 5 });
+  if (key !== movesKey() || generationSnapshot !== state.generation || data.positionId !== state.positionId) {
     return false;
   }
   state.analysis = data;
@@ -308,13 +311,13 @@ async function playAiMove() {
     if (!refreshed) return;
   }
   if (generationSnapshot !== state.generation) return;
-  if (state.analysis?.bestmove && state.legalMoves.includes(state.analysis.bestmove)) {
+  if (state.analysis?.positionId === state.positionId && state.analysis?.bestmove && state.legalMoves.includes(state.analysis.bestmove)) {
     await movePiece(state.analysis.bestmove);
   } else if (state.analysis?.bestmove) {
     state.analysis = null;
     state.analysisKey = "";
     await refreshAnalysis();
-    if (state.analysis?.bestmove && state.legalMoves.includes(state.analysis.bestmove)) {
+    if (state.analysis?.positionId === state.positionId && state.analysis?.bestmove && state.legalMoves.includes(state.analysis.bestmove)) {
       await movePiece(state.analysis.bestmove);
     }
   }

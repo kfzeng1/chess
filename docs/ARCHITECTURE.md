@@ -16,12 +16,14 @@ web/frontend/style.css  Responsive app layout
 2. Frontend calls `/api/position` with the current UCI move list.
 3. Backend rebuilds board state from `startpos + moves`.
 4. Backend returns pieces, side to move, legal moves, game-over state, and move
-   rows in Chinese/UCI.
+   rows in Chinese/UCI. It also returns `positionId`, a stable identity for the
+   current move list.
 5. Frontend renders board pieces and legal target hints.
 6. Frontend calls `/api/analyze` with `moves`, `multipv`, and search limit.
 7. Backend sends `position startpos moves ...` and `go ...` to Pikafish.
 8. Backend parses `bestmove`, `score`, `wdl`, and `pv`, then returns both UCI
-   and Chinese notation.
+   and Chinese notation. The frontend discards analysis whose `positionId` no
+   longer matches the current position.
 
 ## Search Limits
 
@@ -55,5 +57,6 @@ The current frontend is a PWA-ready responsive app. A native shell should keep
 the same API contract and move model:
 
 - Board state: UCI move list.
+- Position audit: `positionId` must match before applying delegated AI moves.
 - Display notation: backend returns Chinese and UCI.
 - AI search: frontend sends explicit UCI search limits.

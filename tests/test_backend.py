@@ -102,6 +102,7 @@ class ServerApiTest(unittest.TestCase):
         status, data = self.request("GET", "/api/state")
         self.assertEqual(status, 200)
         self.assertEqual(data["sideToMove"], "red")
+        self.assertEqual(data["positionId"], "e3b0c44298fc1c14")
         self.assertEqual(len(data["pieces"]), 32)
         self.assertFalse(data["gameOver"])
 
@@ -133,6 +134,7 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(data["sideToMove"], "black")
         self.assertEqual(data["movesCn"], ["炮二平五"])
+        self.assertIn("positionId", data)
         self.assertIn("h9g7", data["legalMoves"])
         self.assertFalse(data["gameOver"])
 
@@ -144,6 +146,7 @@ class ServerApiTest(unittest.TestCase):
     def test_analyze_endpoint_fake_engine(self) -> None:
         status, data = self.request("POST", "/api/analyze", {
             "moves": [],
+            "positionId": "e3b0c44298fc1c14",
             "limit": {"mode": "movetime", "value": 100},
             "multipv": 3,
         })
@@ -151,6 +154,16 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(data["limit"]["command"], "go movetime 100")
         self.assertEqual(len(data["lines"]), 3)
         self.assertIn("pv_cn", data["lines"][0])
+
+    def test_analyze_endpoint_rejects_mismatched_position_id(self) -> None:
+        status, data = self.request("POST", "/api/analyze", {
+            "moves": [],
+            "positionId": "wrong",
+            "limit": {"mode": "movetime", "value": 100},
+            "multipv": 1,
+        })
+        self.assertEqual(status, 400)
+        self.assertIn("positionId", data["error"])
 
     def test_analyze_endpoint_fake_engine_uses_current_side(self) -> None:
         status, data = self.request("POST", "/api/analyze", {
