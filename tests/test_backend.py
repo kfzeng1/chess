@@ -133,6 +133,16 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(len(data["lines"]), 3)
         self.assertIn("pv_cn", data["lines"][0])
 
+    def test_analyze_endpoint_fake_engine_uses_current_side(self) -> None:
+        status, data = self.request("POST", "/api/analyze", {
+            "moves": ["h2e2"],
+            "limit": {"mode": "movetime", "value": 100},
+            "multipv": 3,
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(data["bestmove"][1].isdigit())
+        self.assertIn(data["bestmove"][:2], {"a6", "b7", "b9", "c6", "c9", "d9", "e6", "e9", "f9", "g6", "g9", "h7", "h9", "i6", "a9", "i9"})
+
 
 class FrontendReferenceTest(unittest.TestCase):
     def test_index_references_existing_frontend_files(self) -> None:

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .xiangqi import pv_to_chinese
+from .xiangqi import apply_move, board_after, legal_moves, pv_to_chinese, side_to_move
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -193,10 +193,12 @@ def get_engine() -> Pikafish:
 
 
 def fake_analysis(moves: list[str], multipv: int = 5) -> dict[str, Any]:
-    candidates = ["c3c4", "g3g4", "b2e2", "h2e2", "b0c2"][:multipv]
+    board = board_after(moves)
+    side = side_to_move(moves)
+    candidates = legal_moves(board, side)[:multipv]
     lines = []
     for idx, move in enumerate(candidates, start=1):
-        pv = [move, "b7c7", "h2e2"]
+        pv = build_fake_pv(moves, move)
         lines.append({
             "multipv": idx,
             "depth": 12,
@@ -209,7 +211,23 @@ def fake_analysis(moves: list[str], multipv: int = 5) -> dict[str, Any]:
             "pv_cn": pv_to_chinese(moves, pv),
         })
     return {
-        "bestmove": candidates[0],
-        "bestmove_cn": pv_to_chinese(moves, [candidates[0]])[0],
+        "bestmove": candidates[0] if candidates else "",
+        "bestmove_cn": pv_to_chinese(moves, [candidates[0]])[0] if candidates else "",
         "lines": lines,
     }
+
+
+def build_fake_pv(history: list[str], first_move: str, length: int = 3) -> list[str]:
+    board = board_after(history)
+    pv = [first_move]
+    apply_move(board, first_move)
+    side = "black" if side_to_move(history) == "red" else "red"
+    while len(pv) < length:
+        options = legal_moves(board, side)
+        if not options:
+            break
+        move = options[0]
+        pv.append(move)
+        apply_move(board, move)
+        side = "black" if side == "red" else "red"
+    return pv
