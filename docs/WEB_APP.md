@@ -92,8 +92,8 @@ Response includes:
 - Board pieces are rendered from `/api/position`.
 - Human moves are sent as UCI coordinates.
 - AI analysis refreshes after every move and is independent from move execution.
-- `本步 AI` uses the current analysis best move to play one move for the current side.
-- `自动代走` waits the configured `代走间隔`, then checks whether the current side is AI before playing the current analysis best move. When two AI sides play continuously, this is the minimum delay between two delegated moves.
+- `本步 AI` uses the current analysis best move to play one move for the current side. If the current position has no finished analysis yet, it waits for a fresh analysis result instead of using an old best move.
+- `自动代走` waits the configured `代走间隔`, then checks whether the current side is AI before playing the current analysis best move. When two AI sides play continuously, this is the minimum delay after analysis is ready; if analysis is still running, the actual interval is longer and no delegated move is played until a current best move exists.
 - AI search controls show the exact `go ...` command used by the backend.
 - AI analysis supports full-panel notation switching:
   - `中文`: user-facing Chinese move notation.

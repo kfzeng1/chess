@@ -32,7 +32,7 @@
 
             <div class="delay-control">
               <div class="field-row"><strong>代走间隔</strong><span id="delayLabel">2.0s 最小间隔</span></div>
-              <input id="delayRange" type="range" min="0" max="5" step="0.5" value="2" aria-label="连续 AI 调用间隔">
+              <input id="delayRange" type="range" min="0" max="5" step="0.5" value="2" aria-label="AI 分析完成后的最小代走间隔" title="AI 分析完成后，至少等待这段时间再代走">
             </div>
 
             <div class="field">
@@ -51,7 +51,7 @@
               </div>
             </div>
 
-            <button class="cmd-btn teal" id="manualAi" type="button">本步 AI</button>
+            <button class="cmd-btn teal" id="manualAi" type="button" title="使用当前局面分析完成后的 bestmove 代走；未完成会先等待分析">本步 AI</button>
 
             <div class="ai-card" data-ai-strength="red">
               <div class="field-row"><strong>红方 AI 搜索</strong><span data-ai-label="red">每步 1.0s</span></div>
