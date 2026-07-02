@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "assets" / "current-draft" / "board.png"
+OUT = ROOT / "assets" / "board.png"
 
 W, H = 1800, 2000
 MARGIN = 50

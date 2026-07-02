@@ -8,19 +8,11 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PIECE_DIR = ROOT / "assets" / "current-draft" / "pieces"
-BOARD_PATH = ROOT / "assets" / "current-draft" / "board.png"
-PREVIEW_PATH = ROOT / "assets" / "reference-previews" / "start-position-preview.png"
-PIECE_PREVIEW_PATH = ROOT / "assets" / "reference-previews" / "pieces-preview.png"
+PIECE_DIR = ROOT / "assets" / "pieces"
 
 SIZE = 512
 SCALE = 4
 CANVAS = SIZE * SCALE
-
-GRID_LEFT = 278
-GRID_TOP = 298
-CELL = 156
-PIECE_ON_BOARD = 140  # Increased from 120 to 140 for better visibility
 
 # Premium modern palette - beautiful and elegant
 RED_PALETTE = {
@@ -63,42 +55,6 @@ PIECES = {
     "black_cannon": ("black", "炮"),
     "black_pawn": ("black", "卒"),
 }
-
-START_POSITION = [
-    ("black_rook", 0, 9),
-    ("black_knight", 1, 9),
-    ("black_bishop", 2, 9),
-    ("black_advisor", 3, 9),
-    ("black_king", 4, 9),
-    ("black_advisor", 5, 9),
-    ("black_bishop", 6, 9),
-    ("black_knight", 7, 9),
-    ("black_rook", 8, 9),
-    ("black_cannon", 1, 7),
-    ("black_cannon", 7, 7),
-    ("black_pawn", 0, 6),
-    ("black_pawn", 2, 6),
-    ("black_pawn", 4, 6),
-    ("black_pawn", 6, 6),
-    ("black_pawn", 8, 6),
-    ("red_rook", 0, 0),
-    ("red_knight", 1, 0),
-    ("red_bishop", 2, 0),
-    ("red_advisor", 3, 0),
-    ("red_king", 4, 0),
-    ("red_advisor", 5, 0),
-    ("red_bishop", 6, 0),
-    ("red_knight", 7, 0),
-    ("red_rook", 8, 0),
-    ("red_cannon", 1, 2),
-    ("red_cannon", 7, 2),
-    ("red_pawn", 0, 3),
-    ("red_pawn", 2, 3),
-    ("red_pawn", 4, 3),
-    ("red_pawn", 6, 3),
-    ("red_pawn", 8, 3),
-]
-
 
 def get_font(size: int, paths: list[str]) -> ImageFont.FreeTypeFont:
     for path in paths:
@@ -285,67 +241,8 @@ def render_all_pieces() -> None:
         print(path)
 
 
-def board_xy(file_index: int, rank: int) -> tuple[int, int]:
-    """Convert board coordinates to pixel position."""
-    visual_row = 9 - rank
-    return GRID_LEFT + file_index * CELL, GRID_TOP + visual_row * CELL
-
-
-def render_preview() -> None:
-    """Generate start position preview."""
-    board = Image.open(BOARD_PATH).convert("RGBA")
-
-    for name, file_index, rank in START_POSITION:
-        piece = Image.open(PIECE_DIR / f"{name}.png").convert("RGBA")
-        piece = piece.resize((PIECE_ON_BOARD, PIECE_ON_BOARD), Image.Resampling.LANCZOS)
-        x, y = board_xy(file_index, rank)
-        board.alpha_composite(
-            piece,
-            (round(x - PIECE_ON_BOARD / 2), round(y - PIECE_ON_BOARD / 2))
-        )
-
-    board.save(PREVIEW_PATH, optimize=True)
-    print(PREVIEW_PATH)
-
-
-def render_piece_preview() -> None:
-    """Generate piece sheet preview."""
-    cell = 190
-    margin = 36
-    labels = [
-        "red_king", "red_advisor", "red_bishop", "red_rook",
-        "red_knight", "red_cannon", "red_pawn",
-        "black_king", "black_advisor", "black_bishop", "black_rook",
-        "black_knight", "black_cannon", "black_pawn",
-    ]
-
-    sheet = Image.new("RGBA", (margin * 2 + cell * 7, margin * 2 + cell * 2),
-                     (248, 245, 238, 255))
-    d = ImageDraw.Draw(sheet)
-    d.rounded_rectangle(
-        (12, 12, sheet.width - 12, sheet.height - 12),
-        radius=18,
-        outline=(158, 142, 122, 220),
-        width=4
-    )
-
-    for index, name in enumerate(labels):
-        row = index // 7
-        col = index % 7
-        piece = Image.open(PIECE_DIR / f"{name}.png").convert("RGBA")
-        piece = piece.resize((155, 155), Image.Resampling.LANCZOS)
-        x = margin + col * cell + (cell - 155) // 2
-        y = margin + row * cell + (cell - 155) // 2
-        sheet.alpha_composite(piece, (x, y))
-
-    sheet.save(PIECE_PREVIEW_PATH, optimize=True)
-    print(PIECE_PREVIEW_PATH)
-
-
 def main() -> None:
     render_all_pieces()
-    render_piece_preview()
-    render_preview()
 
 
 if __name__ == "__main__":

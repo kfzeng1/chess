@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>象棋 AI 前端 UI 预览</title>
+    <style>
+      :root {
+        --bg: #ece7de;
+        --surface: #fbfaf7;
+        --surface-2: #f4efe7;
+        --line: #d2c7b8;
+        --text: #29241f;
+        --muted: #766b5f;
+        --red: #c7352d;
+        --black: #282522;
+        --teal: #287f83;
+        --green: #4f7d55;
+        --amber: #a86b25;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.45), rgba(255,255,255,0)),
+          var(--bg);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      .app {
+        min-height: 100vh;
+        display: grid;
+        grid-template-rows: 56px 1fr;
+      }
+
+      .topbar {
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 22px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(251, 250, 247, 0.86);
+        backdrop-filter: blur(12px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .brand-mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: #fff6e5;
+        background: radial-gradient(circle at 35% 28%, #df5b4e, #8e1f1b);
+        box-shadow: 0 1px 0 rgba(255,255,255,0.45) inset;
+        font-weight: 800;
+        font-size: 15px;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 17px;
+        line-height: 1;
+        letter-spacing: 0;
+        white-space: nowrap;
+      }
+
+      .engine-pill {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        background: #fffdf8;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #46a25c;
+        box-shadow: 0 0 0 3px rgba(70, 162, 92, 0.14);
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: 250px minmax(720px, 1fr) 340px;
+        gap: 16px;
+        padding: 16px;
+        min-height: 0;
+      }
+
+      .panel,
+      .board-shell {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(251, 250, 247, 0.92);
+        box-shadow: 0 12px 30px rgba(64, 45, 28, 0.08);
+      }
+
+      .panel {
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .panel-header {
+        height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(244, 239, 231, 0.68);
+      }
+
+      .panel-title {
+        font-size: 13px;
+        font-weight: 760;
+        letter-spacing: 0;
+      }
+
+      .panel-body {
+        padding: 14px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 12px;
+      }
+
+      .toolbar {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      .icon-btn,
+      .cmd-btn {
+        height: 36px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: #fffdf8;
+        color: var(--text);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        cursor: default;
+      }
+
+      .icon-btn {
+        font-size: 17px;
+      }
+
+      .cmd-btn.primary {
+        border-color: #9e322d;
+        background: var(--red);
+        color: white;
+      }
+
+      .cmd-btn.teal {
+        border-color: #1d6b70;
+        background: var(--teal);
+        color: white;
+      }
+
+      .segmented {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        padding: 3px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface-2);
+      }
+
+      .segmented span {
+        height: 30px;
+        display: grid;
+        place-items: center;
+        border-radius: 6px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .segmented .active-red {
+        background: var(--red);
+        color: #fff;
+      }
+
+      .segmented .active-black {
+        background: var(--black);
+        color: #fff;
+      }
+
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+
+      .field-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .field strong {
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .slider {
+        height: 8px;
+        border-radius: 999px;
+        background: #ded5c8;
+        overflow: hidden;
+      }
+
+      .slider i {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+      }
+
+      .slider.red i {
+        width: 62%;
+        background: var(--red);
+      }
+
+      .slider.black i {
+        width: 78%;
+        background: var(--black);
+      }
+
+      .status-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .stat {
+        padding: 10px;
+        border: 1px solid #e2d9ce;
+        border-radius: 7px;
+        background: #fffdf8;
+      }
+
+      .stat span {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .stat strong {
+        display: block;
+        margin-top: 3px;
+        font-size: 15px;
+      }
+
+      .board-shell {
+        min-width: 0;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        padding: 12px;
+      }
+
+      .board-top {
+        display: grid;
+        gap: 10px;
+        padding: 2px 2px 10px;
+      }
+
+      .score-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .turn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 760;
+      }
+
+      .turn::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--red);
+      }
+
+      .clock-row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .clock {
+        min-width: 84px;
+        padding: 7px 9px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: #fffdf8;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        font-weight: 760;
+      }
+
+      .wdl {
+        position: relative;
+        height: 30px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        overflow: hidden;
+        background: linear-gradient(90deg, var(--red) 0 8%, #b7ab9d 8% 98%, var(--black) 98% 100%);
+      }
+
+      .wdl div {
+        position: absolute;
+        top: 0;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        font-size: 12px;
+        font-weight: 760;
+        white-space: nowrap;
+      }
+
+      .wdl .w {
+        left: 10px;
+        color: white;
+      }
+
+      .wdl .d {
+        left: 50%;
+        transform: translateX(-50%);
+        color: #3d332b;
+      }
+
+      .wdl .l {
+        right: 10px;
+        color: white;
+      }
+
+      .board-stage {
+        min-height: 0;
+        display: grid;
+        place-items: center;
+      }
+
+      .board-wrap {
+        position: relative;
+        width: min(100%, 790px);
+        aspect-ratio: 1800 / 2000;
+        filter: drop-shadow(0 20px 34px rgba(53, 32, 18, 0.22));
+      }
+
+      .board-img {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .piece {
+        position: absolute;
+        width: 6.65%;
+        aspect-ratio: 1;
+        left: calc((278 + var(--f) * 156) / 1800 * 100%);
+        top: calc((298 + (9 - var(--r)) * 156) / 2000 * 100%);
+        transform: translate(-50%, -50%);
+        filter: drop-shadow(0 4px 4px rgba(41, 25, 13, 0.25));
+      }
+
+      .piece.last-from,
+      .piece.last-to {
+        border-radius: 50%;
+        outline: 3px solid rgba(40, 127, 131, 0.72);
+        outline-offset: 4px;
+      }
+
+      .hint {
+        position: absolute;
+        width: 2.2%;
+        aspect-ratio: 1;
+        left: calc((278 + var(--f) * 156) / 1800 * 100%);
+        top: calc((298 + (9 - var(--r)) * 156) / 2000 * 100%);
+        transform: translate(-50%, -50%);
+        border-radius: 50%;
+        background: rgba(40, 127, 131, 0.62);
+      }
+
+      .analysis {
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        gap: 12px;
+        min-height: 0;
+      }
+
+      .engine-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .pv {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+      }
+
+      .move-chip {
+        padding: 6px 8px;
+        border-radius: 7px;
+        border: 1px solid var(--line);
+        background: #fffdf8;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .move-chip.red {
+        color: var(--red);
+      }
+
+      .move-chip.black {
+        color: var(--black);
+      }
+
+      .recommendations {
+        display: grid;
+        gap: 8px;
+      }
+
+      .rec {
+        display: grid;
+        grid-template-columns: 30px 1fr auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 54px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fffdf8;
+      }
+
+      .rec.best {
+        border-color: rgba(199, 53, 45, 0.58);
+        background: #fff6f3;
+      }
+
+      .rank {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: white;
+        background: var(--black);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .rec.best .rank {
+        background: var(--red);
+      }
+
+      .rec-main strong {
+        display: block;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 14px;
+      }
+
+      .rec-main span {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .eval {
+        text-align: right;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .eval strong {
+        display: block;
+        color: var(--red);
+        font-size: 14px;
+      }
+
+      .history {
+        min-height: 0;
+      }
+
+      .moves {
+        display: grid;
+        grid-template-columns: 34px 1fr 1fr;
+        row-gap: 7px;
+        column-gap: 8px;
+        font-size: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      .moves .num {
+        color: var(--muted);
+      }
+
+      .moves .red {
+        color: var(--red);
+      }
+
+      .moves .black {
+        color: var(--black);
+      }
+
+      @media (max-width: 1180px) {
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+
+        .board-wrap {
+          width: min(100%, 560px);
+        }
+
+        .panel.left {
+          order: 2;
+        }
+
+        .panel.right {
+          order: 3;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .app {
+          grid-template-rows: auto 1fr;
+        }
+
+        .topbar {
+          height: auto;
+          min-height: 56px;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 9px;
+          padding: 10px 14px;
+        }
+
+        .brand {
+          justify-content: flex-start;
+        }
+
+        .engine-pill {
+          width: 100%;
+          justify-content: flex-start;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          font-size: 12px;
+        }
+
+        .workspace {
+          padding: 10px;
+          gap: 10px;
+        }
+
+        .board-shell {
+          padding: 10px;
+        }
+
+        .clock {
+          min-width: 74px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">象</div>
+          <h1>象棋 AI 对弈</h1>
+        </div>
+        <div class="engine-pill"><span class="dot"></span>Pikafish dev-20260628 | depth 17 | MultiPV 5</div>
+      </header>
+
+      <main class="workspace">
+        <aside class="panel left">
+          <div class="panel-header">
+            <div class="panel-title">对局控制</div>
+          </div>
+          <div class="panel-body stack">
+            <div class="toolbar">
+              <button class="icon-btn" title="新局">↻</button>
+              <button class="icon-btn" title="悔棋">↶</button>
+              <button class="icon-btn" title="翻转">⇅</button>
+            </div>
+
+            <button class="cmd-btn primary">红方走棋</button>
+            <button class="cmd-btn teal">AI 计算一步</button>
+
+            <div class="field">
+              <div class="field-row"><strong>红方</strong><span>Human</span></div>
+              <div class="segmented"><span class="active-red">人类</span><span>AI</span></div>
+            </div>
+
+            <div class="field">
+              <div class="field-row"><strong>黑方</strong><span>Pikafish</span></div>
+              <div class="segmented"><span>人类</span><span class="active-black">AI</span></div>
+            </div>
+
+            <div class="field">
+              <div class="field-row"><strong>红方 AI 强度</strong><span>depth 12</span></div>
+              <div class="slider red"><i></i></div>
+            </div>
+
+            <div class="field">
+              <div class="field-row"><strong>黑方 AI 强度</strong><span>depth 16</span></div>
+              <div class="slider black"><i></i></div>
+            </div>
+
+            <div class="status-grid">
+              <div class="stat"><span>回合</span><strong>红方</strong></div>
+              <div class="stat"><span>手数</span><strong>18</strong></div>
+              <div class="stat"><span>红方用时</span><strong>05:42</strong></div>
+              <div class="stat"><span>黑方用时</span><strong>04:58</strong></div>
+            </div>
+          </div>
+        </aside>
+
+        <section class="board-shell">
+          <div class="board-top">
+            <div class="score-line">
+              <div class="turn">红方回合</div>
+              <div class="clock-row">
+                <div class="clock">05:42</div>
+                <div class="clock">04:58</div>
+              </div>
+            </div>
+            <div class="wdl" aria-label="WDL">
+              <div class="w">胜 8%</div>
+              <div class="d">和 90%</div>
+              <div class="l">负 2%</div>
+            </div>
+          </div>
+          <div class="board-stage">
+            <div class="board-wrap">
+              <img class="board-img" src="../assets/board.png" alt="象棋棋盘">
+
+              <img class="piece" style="--f:0;--r:9" src="../assets/pieces/black_rook.png" alt="">
+              <img class="piece" style="--f:1;--r:9" src="../assets/pieces/black_knight.png" alt="">
+              <img class="piece" style="--f:2;--r:9" src="../assets/pieces/black_bishop.png" alt="">
+              <img class="piece" style="--f:3;--r:9" src="../assets/pieces/black_advisor.png" alt="">
+              <img class="piece" style="--f:4;--r:9" src="../assets/pieces/black_king.png" alt="">
+              <img class="piece" style="--f:5;--r:9" src="../assets/pieces/black_advisor.png" alt="">
+              <img class="piece" style="--f:6;--r:9" src="../assets/pieces/black_bishop.png" alt="">
+              <img class="piece" style="--f:7;--r:9" src="../assets/pieces/black_knight.png" alt="">
+              <img class="piece" style="--f:8;--r:9" src="../assets/pieces/black_rook.png" alt="">
+              <img class="piece" style="--f:1;--r:7" src="../assets/pieces/black_cannon.png" alt="">
+              <img class="piece" style="--f:7;--r:7" src="../assets/pieces/black_cannon.png" alt="">
+              <img class="piece" style="--f:0;--r:6" src="../assets/pieces/black_pawn.png" alt="">
+              <img class="piece" style="--f:2;--r:6" src="../assets/pieces/black_pawn.png" alt="">
+              <img class="piece" style="--f:4;--r:6" src="../assets/pieces/black_pawn.png" alt="">
+              <img class="piece" style="--f:6;--r:6" src="../assets/pieces/black_pawn.png" alt="">
+              <img class="piece" style="--f:8;--r:6" src="../assets/pieces/black_pawn.png" alt="">
+
+              <img class="piece" style="--f:0;--r:0" src="../assets/pieces/red_rook.png" alt="">
+              <img class="piece" style="--f:1;--r:0" src="../assets/pieces/red_knight.png" alt="">
+              <img class="piece" style="--f:2;--r:0" src="../assets/pieces/red_bishop.png" alt="">
+              <img class="piece" style="--f:3;--r:0" src="../assets/pieces/red_advisor.png" alt="">
+              <img class="piece last-from" style="--f:4;--r:0" src="../assets/pieces/red_king.png" alt="">
+              <img class="piece" style="--f:5;--r:0" src="../assets/pieces/red_advisor.png" alt="">
+              <img class="piece" style="--f:6;--r:0" src="../assets/pieces/red_bishop.png" alt="">
+              <img class="piece" style="--f:7;--r:0" src="../assets/pieces/red_knight.png" alt="">
+              <img class="piece" style="--f:8;--r:0" src="../assets/pieces/red_rook.png" alt="">
+              <img class="piece" style="--f:1;--r:2" src="../assets/pieces/red_cannon.png" alt="">
+              <img class="piece" style="--f:7;--r:2" src="../assets/pieces/red_cannon.png" alt="">
+              <img class="piece" style="--f:0;--r:3" src="../assets/pieces/red_pawn.png" alt="">
+              <img class="piece" style="--f:2;--r:3" src="../assets/pieces/red_pawn.png" alt="">
+              <img class="piece" style="--f:4;--r:3" src="../assets/pieces/red_pawn.png" alt="">
+              <img class="piece" style="--f:6;--r:3" src="../assets/pieces/red_pawn.png" alt="">
+              <img class="piece last-to" style="--f:8;--r:3" src="../assets/pieces/red_pawn.png" alt="">
+
+              <span class="hint" style="--f:4;--r:1"></span>
+              <span class="hint" style="--f:5;--r:0"></span>
+            </div>
+          </div>
+        </section>
+
+        <aside class="panel right">
+          <div class="panel-header">
+            <div class="panel-title">AI 分析</div>
+            <span style="color: var(--muted); font-size: 12px;">849k nodes</span>
+          </div>
+          <div class="panel-body analysis">
+            <section class="stack">
+              <div class="engine-row"><span>主变</span><span>depth 17 / nps 849k</span></div>
+              <div class="pv">
+                <span class="move-chip red">c3c4</span>
+                <span class="move-chip black">b7c7</span>
+                <span class="move-chip red">h2e2</span>
+                <span class="move-chip black">g9e7</span>
+                <span class="move-chip red">b0a2</span>
+                <span class="move-chip black">b9a7</span>
+              </div>
+            </section>
+
+            <section class="stack">
+              <div class="engine-row"><span>推荐着法</span><span>MultiPV 5</span></div>
+              <div class="recommendations">
+                <div class="rec best">
+                  <div class="rank">1</div>
+                  <div class="rec-main"><strong>c3c4</strong><span>pv c3c4 b7c7 h2e2</span></div>
+                  <div class="eval"><strong>+0.24</strong><span>WDL 64/923/13</span></div>
+                </div>
+                <div class="rec">
+                  <div class="rank">2</div>
+                  <div class="rec-main"><strong>g3g4</strong><span>pv g3g4 h7g7 b2e2</span></div>
+                  <div class="eval"><strong>+0.21</strong><span>WDL 59/927/14</span></div>
+                </div>
+                <div class="rec">
+                  <div class="rank">3</div>
+                  <div class="rec-main"><strong>b2e2</strong><span>pv b2e2 b9c7 b0c2</span></div>
+                  <div class="eval"><strong>+0.18</strong><span>WDL 55/930/15</span></div>
+                </div>
+                <div class="rec">
+                  <div class="rank">4</div>
+                  <div class="rec-main"><strong>h2e2</strong><span>pv h2e2 h9g7 c3c4</span></div>
+                  <div class="eval"><strong>+0.16</strong><span>WDL 51/932/17</span></div>
+                </div>
+                <div class="rec">
+                  <div class="rank">5</div>
+                  <div class="rec-main"><strong>b0c2</strong><span>pv b0c2 c6c5 g3g4</span></div>
+                  <div class="eval"><strong>+0.12</strong><span>WDL 47/934/19</span></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="history">
+              <div class="engine-row" style="margin-bottom: 10px;"><span>走法记录</span><span>UCI</span></div>
+              <div class="moves">
+                <span class="num">1.</span><span class="red">h2e2</span><span class="black">h9g7</span>
+                <span class="num">2.</span><span class="red">h0g2</span><span class="black">i9h9</span>
+                <span class="num">3.</span><span class="red">i0h0</span><span class="black">b9c7</span>
+                <span class="num">4.</span><span class="red">c3c4</span><span class="black">b7c7</span>
+                <span class="num">5.</span><span class="red">b0a2</span><span class="black">g9e7</span>
+              </div>
+            </section>
+          </div>
+        </aside>
+      </main>
+    </div>
+  </body>
+</html>
