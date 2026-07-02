@@ -3,6 +3,7 @@ const state = {
   pieces: new Map(),
   moves: [],
   sideToMove: "red",
+  legalMoves: [],
   selected: null,
   lastMove: null,
   flipped: false,
@@ -100,12 +101,16 @@ function renderBoard() {
   }
 
   if (state.selected) {
-    const coord = squareToCoord(state.selected);
-    const hint = document.createElement("span");
-    hint.className = "hint";
-    hint.style.setProperty("--f", coord.f);
-    hint.style.setProperty("--r", coord.r);
-    el.board.appendChild(hint);
+    state.legalMoves
+      .filter((move) => move.slice(0, 2) === state.selected)
+      .forEach((move) => {
+        const coord = squareToCoord(move.slice(2, 4));
+        const hint = document.createElement("span");
+        hint.className = "hint";
+        hint.style.setProperty("--f", coord.f);
+        hint.style.setProperty("--r", coord.r);
+        el.board.appendChild(hint);
+      });
   }
 }
 
@@ -170,6 +175,7 @@ async function syncPosition() {
   const data = await api("/api/position", { moves: state.moves });
   state.pieces = new Map(data.pieces.map((piece) => [piece.square, piece]));
   state.sideToMove = data.sideToMove;
+  state.legalMoves = data.legalMoves || [];
   renderBoard();
   renderStatus();
   renderHistory(data);
@@ -199,7 +205,9 @@ function handleSquareClick(square) {
     renderBoard();
     return;
   }
-  movePiece(state.selected + square).catch(showError);
+  const move = state.selected + square;
+  if (!state.legalMoves.includes(move)) return;
+  movePiece(move).catch(showError);
 }
 
 function currentLimit() {

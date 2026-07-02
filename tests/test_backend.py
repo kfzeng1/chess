@@ -11,7 +11,7 @@ from pathlib import Path
 
 from web.backend.engine import SearchLimit, parse_info
 from web.backend.server import XiangqiHandler
-from web.backend.xiangqi import board_after, move_rows, moves_to_chinese, side_to_move
+from web.backend.xiangqi import board_after, legal_moves, move_rows, moves_to_chinese, side_to_move, validate_legal_sequence
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +33,17 @@ class XiangqiCoreTest(unittest.TestCase):
         board = board_after(["h2e2"])
         self.assertNotIn("h2", board)
         self.assertEqual(board["e2"].role, "cannon")
+
+    def test_initial_legal_moves_include_common_openings(self) -> None:
+        moves = legal_moves(board_after([]), "red")
+        self.assertIn("h2e2", moves)
+        self.assertIn("c3c4", moves)
+        self.assertIn("b0c2", moves)
+
+    def test_legal_sequence_rejects_own_capture(self) -> None:
+        validate_legal_sequence(["h2e2", "h9g7"])
+        with self.assertRaises(ValueError):
+            validate_legal_sequence(["h2h0"])
 
 
 class EngineParsingTest(unittest.TestCase):
@@ -104,6 +115,12 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(data["sideToMove"], "black")
         self.assertEqual(data["movesCn"], ["炮二平五"])
+        self.assertIn("h9g7", data["legalMoves"])
+
+    def test_position_endpoint_rejects_illegal_history(self) -> None:
+        status, data = self.request("POST", "/api/position", {"moves": ["h2h0"]})
+        self.assertEqual(status, 400)
+        self.assertIn("illegal move", data["error"])
 
     def test_analyze_endpoint_fake_engine(self) -> None:
         status, data = self.request("POST", "/api/analyze", {

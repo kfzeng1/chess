@@ -89,6 +89,173 @@ def validate_move(move: str) -> None:
     parse_square(move[2:])
 
 
+def square_name(file_idx: int, rank: int) -> str:
+    return f"{FILES[file_idx]}{rank}"
+
+
+def in_bounds(file_idx: int, rank: int) -> bool:
+    return 0 <= file_idx < 9 and 0 <= rank < 10
+
+
+def in_palace(side: str, file_idx: int, rank: int) -> bool:
+    if file_idx < 3 or file_idx > 5:
+        return False
+    return 0 <= rank <= 2 if side == "red" else 7 <= rank <= 9
+
+
+def add_if_available(board: dict[str, Piece], moves: list[str], src: str, side: str, file_idx: int, rank: int) -> None:
+    if not in_bounds(file_idx, rank):
+        return
+    dst = square_name(file_idx, rank)
+    target = board.get(dst)
+    if target is None or target.side != side:
+        moves.append(src + dst)
+
+
+def sliding_moves(board: dict[str, Piece], src: str, side: str, cannon: bool = False) -> list[str]:
+    fx, fy = parse_square(src)
+    moves: list[str] = []
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        seen_screen = False
+        x, y = fx + dx, fy + dy
+        while in_bounds(x, y):
+            dst = square_name(x, y)
+            target = board.get(dst)
+            if not cannon:
+                if target is None:
+                    moves.append(src + dst)
+                else:
+                    if target.side != side:
+                        moves.append(src + dst)
+                    break
+            elif not seen_screen:
+                if target is None:
+                    moves.append(src + dst)
+                else:
+                    seen_screen = True
+            else:
+                if target is not None:
+                    if target.side != side:
+                        moves.append(src + dst)
+                    break
+            x += dx
+            y += dy
+    return moves
+
+
+def knight_moves(board: dict[str, Piece], src: str, side: str) -> list[str]:
+    fx, fy = parse_square(src)
+    moves: list[str] = []
+    candidates = [
+        (1, 2, 0, 1), (-1, 2, 0, 1), (1, -2, 0, -1), (-1, -2, 0, -1),
+        (2, 1, 1, 0), (2, -1, 1, 0), (-2, 1, -1, 0), (-2, -1, -1, 0),
+    ]
+    for dx, dy, lx, ly in candidates:
+        leg_x, leg_y = fx + lx, fy + ly
+        if not in_bounds(leg_x, leg_y):
+            continue
+        if square_name(leg_x, leg_y) in board:
+            continue
+        add_if_available(board, moves, src, side, fx + dx, fy + dy)
+    return moves
+
+
+def bishop_moves(board: dict[str, Piece], src: str, side: str) -> list[str]:
+    fx, fy = parse_square(src)
+    moves: list[str] = []
+    for dx, dy in ((2, 2), (-2, 2), (2, -2), (-2, -2)):
+        tx, ty = fx + dx, fy + dy
+        if not in_bounds(tx, ty):
+            continue
+        if side == "red" and ty > 4:
+            continue
+        if side == "black" and ty < 5:
+            continue
+        if square_name(fx + dx // 2, fy + dy // 2) in board:
+            continue
+        add_if_available(board, moves, src, side, tx, ty)
+    return moves
+
+
+def advisor_moves(board: dict[str, Piece], src: str, side: str) -> list[str]:
+    fx, fy = parse_square(src)
+    moves: list[str] = []
+    for dx, dy in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+        tx, ty = fx + dx, fy + dy
+        if in_palace(side, tx, ty):
+            add_if_available(board, moves, src, side, tx, ty)
+    return moves
+
+
+def king_moves(board: dict[str, Piece], src: str, side: str) -> list[str]:
+    fx, fy = parse_square(src)
+    moves: list[str] = []
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        tx, ty = fx + dx, fy + dy
+        if in_palace(side, tx, ty):
+            add_if_available(board, moves, src, side, tx, ty)
+
+    dy = 1 if side == "red" else -1
+    y = fy + dy
+    while in_bounds(fx, y):
+        target = board.get(square_name(fx, y))
+        if target is not None:
+            if target.role == "king" and target.side != side:
+                moves.append(src + square_name(fx, y))
+            break
+        y += dy
+    return moves
+
+
+def pawn_moves(board: dict[str, Piece], src: str, side: str) -> list[str]:
+    fx, fy = parse_square(src)
+    moves: list[str] = []
+    forward = 1 if side == "red" else -1
+    add_if_available(board, moves, src, side, fx, fy + forward)
+    crossed = fy >= 5 if side == "red" else fy <= 4
+    if crossed:
+        add_if_available(board, moves, src, side, fx - 1, fy)
+        add_if_available(board, moves, src, side, fx + 1, fy)
+    return moves
+
+
+def legal_moves_for_piece(board: dict[str, Piece], square: str) -> list[str]:
+    piece = board[square]
+    if piece.role == "rook":
+        return sliding_moves(board, square, piece.side)
+    if piece.role == "cannon":
+        return sliding_moves(board, square, piece.side, cannon=True)
+    if piece.role == "knight":
+        return knight_moves(board, square, piece.side)
+    if piece.role == "bishop":
+        return bishop_moves(board, square, piece.side)
+    if piece.role == "advisor":
+        return advisor_moves(board, square, piece.side)
+    if piece.role == "king":
+        return king_moves(board, square, piece.side)
+    if piece.role == "pawn":
+        return pawn_moves(board, square, piece.side)
+    return []
+
+
+def legal_moves(board: dict[str, Piece], side: str) -> list[str]:
+    result: list[str] = []
+    for square, piece in board.items():
+        if piece.side == side:
+            result.extend(legal_moves_for_piece(board, square))
+    return sorted(result)
+
+
+def validate_legal_sequence(moves: list[str]) -> None:
+    board = initial_board()
+    for idx, move in enumerate(moves):
+        side = "red" if idx % 2 == 0 else "black"
+        allowed = legal_moves(board, side)
+        if move not in allowed:
+            raise ValueError(f"illegal move for {side}: {move}")
+        apply_move(board, move)
+
+
 def apply_move(board: dict[str, Piece], move: str) -> Piece:
     validate_move(move)
     src = move[:2]
@@ -96,6 +263,9 @@ def apply_move(board: dict[str, Piece], move: str) -> Piece:
     piece = board.get(src)
     if piece is None:
         raise ValueError(f"no piece on source square: {src}")
+    target = board.get(dst)
+    if target is not None and target.side == piece.side:
+        raise ValueError(f"cannot capture own piece: {dst}")
     board.pop(src)
     board[dst] = piece
     return piece

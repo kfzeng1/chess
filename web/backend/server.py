@@ -9,7 +9,7 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 from .engine import SearchLimit, fake_analysis, get_engine
-from .xiangqi import START_BOARD, Piece, board_after, move_rows, moves_to_chinese, side_to_move, validate_move
+from .xiangqi import START_BOARD, Piece, board_after, legal_moves, move_rows, moves_to_chinese, side_to_move, validate_legal_sequence, validate_move
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -85,6 +85,7 @@ class XiangqiHandler(BaseHTTPRequestHandler):
             "pieces": pieces,
             "sideToMove": "red",
             "moves": [],
+            "legalMoves": legal_moves(dict(START_BOARD), "red"),
             "moveRows": [],
             "assets": {"board": "/assets/board.png"},
         })
@@ -92,12 +93,15 @@ class XiangqiHandler(BaseHTTPRequestHandler):
     def handle_position(self) -> None:
         payload = read_json(self)
         moves = normalize_moves(payload.get("moves", []))
+        validate_legal_sequence(moves)
         board = board_after(moves)
+        turn = side_to_move(moves)
         pieces = [piece_payload(square, piece) for square, piece in sorted(board.items())]
         json_response(self, 200, {
             "pieces": pieces,
-            "sideToMove": side_to_move(moves),
+            "sideToMove": turn,
             "moves": moves,
+            "legalMoves": legal_moves(board, turn),
             "movesCn": moves_to_chinese(moves),
             "moveRowsCn": move_rows(moves, "cn"),
             "moveRowsUci": move_rows(moves, "uci"),
@@ -106,6 +110,7 @@ class XiangqiHandler(BaseHTTPRequestHandler):
     def handle_analyze(self) -> None:
         payload = read_json(self)
         moves = normalize_moves(payload.get("moves", []))
+        validate_legal_sequence(moves)
         limit = SearchLimit.from_payload(payload.get("limit"))
         multipv = int(payload.get("multipv", 5))
         if os.environ.get("XIANGQI_FAKE_ENGINE") == "1":
