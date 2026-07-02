@@ -7,6 +7,39 @@ its matching NNUE network.
 
 - `engines/pikafish-avxvnni`: Pikafish engine binary
 - `engines/pikafish.nnue`: NNUE evaluation network
+- `assets/current-draft/board.png`: current low-quality board draft
+- `assets/current-draft/pieces/*.png`: current low-quality piece drafts
+- `assets/reference-previews/pieces-preview.png`: piece sheet preview
+- `assets/reference-previews/start-position-preview.png`: board and pieces start-position preview
+- `tools/asset-generation/render_xiangqi_board.py`: board rendering script
+- `tools/asset-generation/render_xiangqi_pieces.py`: piece rendering script
+- `docs/ASSET_HANDOFF.md`: handoff notes for replacing the current draft assets
+
+## Assets
+
+The current assets are placeholders and are not production quality. See
+`docs/ASSET_HANDOFF.md` before replacing or redesigning them.
+
+Regenerate the current draft board with:
+
+```bash
+python3 tools/asset-generation/render_xiangqi_board.py
+```
+
+Regenerate current draft pieces and previews with:
+
+```bash
+python3 tools/asset-generation/render_xiangqi_pieces.py
+```
+
+Board coordinates follow Pikafish/UCI notation:
+
+- Files: `a` through `i`, left to right
+- Ranks: `0` at the red side bottom, `9` at the black side top
+- Example: `c3c4` means move from file `c`, rank `3` to file `c`, rank `4`
+
+Piece filenames use side and role names, for example `red_king.png`,
+`black_cannon.png`, and `red_pawn.png`.
 
 ## Version
 
