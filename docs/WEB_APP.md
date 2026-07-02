@@ -10,6 +10,12 @@ Start the real Pikafish-backed server:
 python3 -m web.backend.server
 ```
 
+Shortcut:
+
+```bash
+make run
+```
+
 Open:
 
 ```text
@@ -20,6 +26,12 @@ For fast UI/testing without launching Pikafish, use fake engine mode:
 
 ```bash
 XIANGQI_FAKE_ENGINE=1 python3 -m web.backend.server
+```
+
+Shortcut:
+
+```bash
+make run-fake
 ```
 
 ## API
@@ -82,6 +94,12 @@ Run:
 
 ```bash
 python3 -m unittest discover -s tests -v
+```
+
+Shortcut:
+
+```bash
+make test
 ```
 
 The tests cover:

@@ -24,6 +24,7 @@ tools/asset-generation/
 web/
   backend/               # Python stdlib API server and Pikafish adapter
   frontend/              # HTML/CSS/JS web app
+Makefile                 # common run/test/screenshot commands
 ```
 
 ## Web App
@@ -32,6 +33,12 @@ The runnable web app lives under `web/`.
 
 ```bash
 python3 -m web.backend.server
+```
+
+or:
+
+```bash
+make run
 ```
 
 Open:
@@ -46,6 +53,12 @@ Fast test mode without launching Pikafish:
 XIANGQI_FAKE_ENGINE=1 python3 -m web.backend.server
 ```
 
+or:
+
+```bash
+make run-fake
+```
+
 Refresh the desktop screenshot:
 
 ```bash
@@ -58,6 +71,12 @@ Run tests:
 
 ```bash
 python3 -m unittest discover -s tests -v
+```
+
+or:
+
+```bash
+make test
 ```
 
 More details: [docs/WEB_APP.md](docs/WEB_APP.md).
