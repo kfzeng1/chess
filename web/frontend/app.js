@@ -160,7 +160,7 @@ function renderAnalysis() {
   el.nodesText.textContent = `${best.nodes || 0} nodes`;
   if (best.wdl) {
     el.wdlRed.textContent = `红胜 ${Math.round(best.wdl[0] / 10)}%`;
-    el.wdlDraw.textContent = `和 ${Math.round(best.wdl[1] / 10)}%`;
+    el.wdlDraw.textContent = `和棋 ${Math.round(best.wdl[1] / 10)}%`;
     el.wdlBlack.textContent = `黑胜 ${Math.round(best.wdl[2] / 10)}%`;
   }
 
