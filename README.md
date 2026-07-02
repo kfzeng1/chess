@@ -11,6 +11,7 @@ assets/
   pieces/*.png           # latest red/black piece images
   ui-preview.png         # latest desktop web app screenshot
 docs/
+  MOBILE_MIGRATION.md    # mobile/PWA migration notes
   WEB_APP.md             # web app API and run notes
 engines/
   pikafish-avxvnni       # Pikafish Linux x86-64 AVX-VNNI binary
@@ -60,6 +61,7 @@ python3 -m unittest discover -s tests -v
 ```
 
 More details: [docs/WEB_APP.md](docs/WEB_APP.md).
+Mobile migration notes: [docs/MOBILE_MIGRATION.md](docs/MOBILE_MIGRATION.md).
 
 ## Regenerate Assets
 

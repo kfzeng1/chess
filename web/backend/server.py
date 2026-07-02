@@ -56,6 +56,14 @@ class XiangqiHandler(BaseHTTPRequestHandler):
             return
         self.serve_static(path)
 
+    def do_HEAD(self) -> None:
+        path = unquote(urlparse(self.path).path)
+        if path.startswith("/api/"):
+            self.send_response(405)
+            self.end_headers()
+            return
+        self.serve_static(path, head_only=True)
+
     def do_POST(self) -> None:
         path = unquote(urlparse(self.path).path)
         try:
@@ -110,7 +118,7 @@ class XiangqiHandler(BaseHTTPRequestHandler):
             **analysis,
         })
 
-    def serve_static(self, path: str) -> None:
+    def serve_static(self, path: str, head_only: bool = False) -> None:
         if path in {"", "/"}:
             file_path = FRONTEND_DIR / "index.html"
         elif path.startswith("/assets/"):
@@ -133,7 +141,8 @@ class XiangqiHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        if not head_only:
+            self.wfile.write(data)
 
 
 def normalize_moves(raw_moves: Any) -> list[str]:

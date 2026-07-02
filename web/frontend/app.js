@@ -335,3 +335,9 @@ bindControls();
 updateAiSearch("red");
 updateAiSearch("black");
 syncPosition().then(() => analyze(false)).catch(showError);
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/service-worker.js").catch((error) => {
+    console.warn("service worker registration failed", error);
+  });
+}

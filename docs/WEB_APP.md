@@ -73,6 +73,8 @@ Response includes:
 - AI analysis supports full-panel notation switching:
   - `中文`: user-facing Chinese move notation.
   - `UCI`: engine coordinates.
+- The frontend includes a PWA manifest and service worker for mobile migration
+  preparation.
 
 ## Tests
 

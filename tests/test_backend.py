@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import unittest
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 
 from web.backend.engine import SearchLimit, parse_info
 from web.backend.server import XiangqiHandler
 from web.backend.xiangqi import board_after, move_rows, moves_to_chinese, side_to_move
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class XiangqiCoreTest(unittest.TestCase):
@@ -77,6 +82,23 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(data["sideToMove"], "red")
         self.assertEqual(len(data["pieces"]), 32)
 
+    def test_static_frontend_assets(self) -> None:
+        for path in ["/", "/style.css", "/app.js", "/manifest.webmanifest", "/service-worker.js", "/assets/board.png"]:
+            conn = HTTPConnection("127.0.0.1", self.port, timeout=5)
+            conn.request("GET", path)
+            response = conn.getresponse()
+            response.read()
+            conn.close()
+            self.assertEqual(response.status, 200, path)
+
+    def test_static_head_request(self) -> None:
+        conn = HTTPConnection("127.0.0.1", self.port, timeout=5)
+        conn.request("HEAD", "/manifest.webmanifest")
+        response = conn.getresponse()
+        response.read()
+        conn.close()
+        self.assertEqual(response.status, 200)
+
     def test_position_endpoint(self) -> None:
         status, data = self.request("POST", "/api/position", {"moves": ["h2e2"]})
         self.assertEqual(status, 200)
@@ -93,6 +115,23 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(data["limit"]["command"], "go movetime 100")
         self.assertEqual(len(data["lines"]), 3)
         self.assertIn("pv_cn", data["lines"][0])
+
+
+class FrontendReferenceTest(unittest.TestCase):
+    def test_index_references_existing_frontend_files(self) -> None:
+        html = (ROOT / "web" / "frontend" / "index.html").read_text(encoding="utf-8")
+        refs = re.findall(r'href="(/[^"]+)"|src="(/[^"]+)"', html)
+        paths = [match[0] or match[1] for match in refs]
+        for path in paths:
+            if path.startswith("/assets/"):
+                self.assertTrue((ROOT / path.lstrip("/")).exists(), path)
+            elif path.startswith("/"):
+                self.assertTrue((ROOT / "web" / "frontend" / path.lstrip("/")).exists(), path)
+
+    def test_manifest_icon_exists(self) -> None:
+        manifest = json.loads((ROOT / "web" / "frontend" / "manifest.webmanifest").read_text(encoding="utf-8"))
+        for icon in manifest["icons"]:
+            self.assertTrue((ROOT / icon["src"].lstrip("/")).exists(), icon["src"])
 
 
 if __name__ == "__main__":
