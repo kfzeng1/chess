@@ -51,6 +51,9 @@ class XiangqiHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = unquote(urlparse(self.path).path)
+        if path == "/api/health":
+            self.handle_health()
+            return
         if path == "/api/state":
             self.handle_state()
             return
@@ -88,6 +91,13 @@ class XiangqiHandler(BaseHTTPRequestHandler):
             "legalMoves": legal_moves(dict(START_BOARD), "red"),
             "moveRows": [],
             "assets": {"board": "/assets/board.png"},
+        })
+
+    def handle_health(self) -> None:
+        json_response(self, 200, {
+            "ok": True,
+            "engine": "fake" if os.environ.get("XIANGQI_FAKE_ENGINE") == "1" else "pikafish",
+            "version": "0.1",
         })
 
     def handle_position(self) -> None:

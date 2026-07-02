@@ -104,6 +104,12 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(data["sideToMove"], "red")
         self.assertEqual(len(data["pieces"]), 32)
 
+    def test_health_endpoint(self) -> None:
+        status, data = self.request("GET", "/api/health")
+        self.assertEqual(status, 200)
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["engine"], "fake")
+
     def test_static_frontend_assets(self) -> None:
         for path in ["/", "/style.css", "/app.js", "/manifest.webmanifest", "/service-worker.js", "/assets/board.png"]:
             conn = HTTPConnection("127.0.0.1", self.port, timeout=5)

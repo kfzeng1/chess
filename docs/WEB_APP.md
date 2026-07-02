@@ -40,6 +40,18 @@ make run-fake
 
 Returns the initial board, side to move, and asset paths.
 
+### `GET /api/health`
+
+Returns a lightweight health payload with engine mode:
+
+```json
+{
+  "ok": true,
+  "engine": "pikafish",
+  "version": "0.1"
+}
+```
+
 ### `POST /api/position`
 
 Request:
