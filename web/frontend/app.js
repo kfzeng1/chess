@@ -191,14 +191,24 @@ async function syncPosition() {
 }
 
 async function movePiece(move) {
+  const previousMoves = [...state.moves];
+  const previousLastMove = state.lastMove;
   state.moves.push(move);
   state.lastMove = move;
   state.selected = null;
   state.analysis = null;
   state.analysisKey = "";
-  await syncPosition();
-  await refreshAnalysis();
-  scheduleAuto();
+  try {
+    await syncPosition();
+    await refreshAnalysis();
+    scheduleAuto();
+  } catch (error) {
+    state.moves = previousMoves;
+    state.lastMove = previousLastMove;
+    state.selected = null;
+    await syncPosition();
+    throw error;
+  }
 }
 
 function handleSquareClick(square) {
@@ -221,8 +231,8 @@ function handleSquareClick(square) {
   movePiece(move).catch(showError);
 }
 
-function currentLimit() {
-  const config = state.aiSearch[state.sideToMove];
+function currentLimit(side = state.sideToMove) {
+  const config = state.aiSearch[side];
   return {
     mode: config.mode,
     value: config.mode === "depth" ? config.depth : Math.round(config.movetime * 1000),
@@ -238,25 +248,40 @@ async function refreshAnalysis() {
     state.analysis = null;
     state.analysisKey = movesKey();
     renderAnalysis();
-    return;
+    return true;
   }
+  const key = movesKey();
+  const movesSnapshot = [...state.moves];
+  const sideSnapshot = state.sideToMove;
   el.thinking.textContent = "思考中";
   el.engineStatus.textContent = "Pikafish thinking";
-  const data = await api("/api/analyze", { moves: state.moves, limit: currentLimit(), multipv: 5 });
+  const data = await api("/api/analyze", { moves: movesSnapshot, limit: currentLimit(sideSnapshot), multipv: 5 });
+  if (key !== movesKey()) {
+    return false;
+  }
   state.analysis = data;
-  state.analysisKey = movesKey();
+  state.analysisKey = key;
   renderAnalysis();
   el.thinking.textContent = "待命";
   el.engineStatus.textContent = "Pikafish ready";
+  return true;
 }
 
 async function playAiMove() {
   if (state.gameOver) return;
   if (!state.analysis || state.analysisKey !== movesKey()) {
-    await refreshAnalysis();
+    const refreshed = await refreshAnalysis();
+    if (!refreshed) return;
   }
-  if (state.analysis?.bestmove) {
+  if (state.analysis?.bestmove && state.legalMoves.includes(state.analysis.bestmove)) {
     await movePiece(state.analysis.bestmove);
+  } else if (state.analysis?.bestmove) {
+    state.analysis = null;
+    state.analysisKey = "";
+    await refreshAnalysis();
+    if (state.analysis?.bestmove && state.legalMoves.includes(state.analysis.bestmove)) {
+      await movePiece(state.analysis.bestmove);
+    }
   }
 }
 
