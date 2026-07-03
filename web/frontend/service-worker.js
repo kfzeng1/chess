@@ -1,4 +1,4 @@
-const CACHE_NAME = "xiangqi-ai-v2";
+const CACHE_NAME = "xiangqi-ai-v3";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
@@ -6,8 +6,20 @@ const STATIC_ASSETS = [
   "/app.js",
   "/manifest.webmanifest",
   "/assets/board.png",
+  "/assets/pieces/red_advisor.png",
+  "/assets/pieces/red_bishop.png",
+  "/assets/pieces/red_cannon.png",
   "/assets/pieces/red_king.png",
+  "/assets/pieces/red_knight.png",
+  "/assets/pieces/red_pawn.png",
+  "/assets/pieces/red_rook.png",
+  "/assets/pieces/black_advisor.png",
+  "/assets/pieces/black_bishop.png",
+  "/assets/pieces/black_cannon.png",
   "/assets/pieces/black_king.png",
+  "/assets/pieces/black_knight.png",
+  "/assets/pieces/black_pawn.png",
+  "/assets/pieces/black_rook.png",
 ];
 
 self.addEventListener("install", (event) => {

@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>象棋 AI 对弈</title>
     <meta name="theme-color" content="#c7352d">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="apple-touch-icon" href="/assets/pieces/red_king.png">
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="stylesheet" href="/style.css">
   </head>
@@ -16,14 +20,14 @@
           <h1>象棋 AI 对弈</h1>
         </div>
         <div class="mobile-drawer-actions" aria-label="移动端面板">
-          <button class="drawer-tab left-tab" type="button" data-open-drawer="left">配置</button>
-          <button class="drawer-tab right-tab" type="button" data-open-drawer="right">分析</button>
+          <button class="drawer-tab left-tab" type="button" data-open-drawer="left" aria-controls="controlsPanel" aria-expanded="false">配置</button>
+          <button class="drawer-tab right-tab" type="button" data-open-drawer="right" aria-controls="analysisPanel" aria-expanded="false">分析</button>
         </div>
         <div class="engine-pill"><span class="dot"></span><span id="engineStatus">Pikafish ready</span></div>
       </header>
 
       <main class="workspace">
-        <aside class="panel left controls-panel">
+        <aside class="panel left controls-panel" id="controlsPanel" tabindex="-1" role="dialog" aria-label="对局配置">
           <div class="panel-header">
             <div class="panel-title">对局配置</div>
             <button class="drawer-close" type="button" data-close-drawer aria-label="关闭配置">×</button>
@@ -138,7 +142,7 @@
           </div>
         </section>
 
-        <aside class="panel right">
+        <aside class="panel right" id="analysisPanel" tabindex="-1" role="dialog" aria-label="AI 分析">
           <div class="panel-header">
             <div class="panel-title">AI 分析</div>
             <span id="nodesText">0 nodes</span>

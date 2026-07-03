@@ -2,6 +2,33 @@ const { test, expect } = require("@playwright/test");
 
 test.use({ serviceWorkers: "block" });
 
+async function mockAnalysis(page) {
+  await page.route("**/api/analyze", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        sideToMove: "red",
+        positionId: "e3b0c44298fc1c14",
+        limit: { mode: "movetime", value: 1000, command: "go movetime 1000" },
+        bestmove: "h2e2",
+        bestmove_cn: "炮二平五",
+        lines: [{
+          multipv: 1,
+          depth: 8,
+          nodes: 1200,
+          nps: 40000,
+          score: { display: "红方 +0.24" },
+          wdl: [120, 820, 60],
+          pv: ["h2e2", "h9g7"],
+          bestmove: "h2e2",
+          pv_cn: ["炮二平五", "马8进7"],
+        }],
+      }),
+    });
+  });
+}
+
 test("mismatch alert disables auto mode and restores the checked position", async ({ page }) => {
   const alerts = [];
   page.on("dialog", async (dialog) => {
@@ -72,30 +99,7 @@ test("undo reruns analysis once after the debounce window", async ({ page }) => 
 
 test("mobile layout keeps board primary and controls usable", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.route("**/api/analyze", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        sideToMove: "red",
-        positionId: "e3b0c44298fc1c14",
-        limit: { mode: "movetime", value: 1000, command: "go movetime 1000" },
-        bestmove: "h2e2",
-        bestmove_cn: "炮二平五",
-        lines: [{
-          multipv: 1,
-          depth: 8,
-          nodes: 1200,
-          nps: 40000,
-          score: { display: "红方 +0.24" },
-          wdl: [120, 820, 60],
-          pv: ["h2e2", "h9g7"],
-          bestmove: "h2e2",
-          pv_cn: ["炮二平五", "马8进7"],
-        }],
-      }),
-    });
-  });
+  await mockAnalysis(page);
 
   await page.goto("http://127.0.0.1:8080/");
   await page.waitForLoadState("networkidle");
@@ -122,16 +126,23 @@ test("mobile layout keeps board primary and controls usable", async ({ page }) =
 
   const closedLeft = await page.locator(".controls-panel").boundingBox();
   expect(closedLeft.x).toBeLessThan(-250);
-  await page.getByRole("button", { name: "配置", exact: true }).click();
+  const configButton = page.getByRole("button", { name: "配置", exact: true });
+  await expect(configButton).toHaveAttribute("aria-expanded", "false");
+  await configButton.click();
+  await expect(configButton).toHaveAttribute("aria-expanded", "true");
   await expect.poll(async () => (await page.locator(".controls-panel").boundingBox()).x).toBeGreaterThanOrEqual(-1);
   await expect(page.locator(".controls-panel #autoMode")).toBeHidden();
   await expect(page.locator(".controls-panel #manualAi")).toBeHidden();
   await expect(page.locator(".controls-panel .status-grid")).toBeHidden();
-  await page.getByLabel("关闭配置").click();
+  await page.keyboard.press("Escape");
+  await expect(configButton).toHaveAttribute("aria-expanded", "false");
 
   const closedRight = await page.locator(".panel.right").boundingBox();
   expect(closedRight.x).toBeGreaterThan(380);
-  await page.getByRole("button", { name: "分析", exact: true }).click();
+  const analysisButton = page.getByRole("button", { name: "分析", exact: true });
+  await expect(analysisButton).toHaveAttribute("aria-expanded", "false");
+  await analysisButton.click();
+  await expect(analysisButton).toHaveAttribute("aria-expanded", "true");
   await expect.poll(async () => {
     const box = await page.locator(".panel.right").boundingBox();
     return Math.round(box.x + box.width);
@@ -140,4 +151,27 @@ test("mobile layout keeps board primary and controls usable", async ({ page }) =
   expect(openRight.x + openRight.width).toBeLessThanOrEqual(391);
   await expect(page.locator("#auditSection")).toBeHidden();
   await expect(page.locator("#recommendations")).toBeVisible();
+});
+
+test("mobile layout handles narrow and landscape viewports", async ({ page }) => {
+  await mockAnalysis(page);
+
+  for (const viewport of [
+    { width: 360, height: 740, minBoard: 320 },
+    { width: 844, height: 390, minBoard: 190 },
+  ]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("http://127.0.0.1:8080/");
+    await page.waitForLoadState("networkidle");
+
+    const board = await page.locator("#board").boundingBox();
+    const bodyWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    const actions = await page.locator(".mobile-board-actions").boundingBox();
+
+    expect(bodyWidth).toBeLessThanOrEqual(viewport.width);
+    expect(board.width).toBeGreaterThan(viewport.minBoard);
+    expect(actions.width).toBeGreaterThan(300);
+    await expect(page.locator("#autoModeMobile")).toBeVisible();
+    await expect(page.locator("#turnStatMobile")).toBeVisible();
+  }
 });

@@ -8,6 +8,7 @@ web/backend/engine.py   Pikafish UCI adapter and fake test engine
 web/backend/xiangqi.py  Board state, notation, legal move generation
 web/frontend/app.js     Browser state, board interaction, AI workflow
 web/frontend/style.css  Responsive app layout
+android/app/            Native offline Android APK
 ```
 
 ## Data Flow
@@ -53,10 +54,22 @@ Still pending:
 
 ## Mobile Direction
 
-The current frontend is a PWA-ready responsive app. A native shell should keep
-the same API contract and move model:
+The primary mobile target is now a native offline APK under `android/`.
+The responsive web app remains useful for desktop and browser-based preview.
+
+The Android APK keeps the same core model as the web app:
 
 - Board state: UCI move list.
-- Position audit: `positionId` must match before applying delegated AI moves.
-- Display notation: backend returns Chinese and UCI.
-- AI search: frontend sends explicit UCI search limits.
+- Engine protocol: UCI `position startpos moves ...` and `go ...`.
+- Display notation: Chinese and UCI.
+- Delegated move safety: only play a bestmove after the current position and
+  local legal-move list still match.
+
+The APK is self-contained:
+
+- `android/app/src/main/jniLibs/arm64-v8a/libpikafish.so` is Pikafish
+  dev-20260628 rebuilt for Android arm64.
+- `android/app/src/main/assets/pikafish.nnue` is copied to app-private storage
+  and passed to Pikafish as `EvalFile`.
+- `MainActivity.java` owns the native board UI, engine process, AI toggles,
+  auto delegated moves, WDL/score/PV parsing, and Chinese/UCI switching.

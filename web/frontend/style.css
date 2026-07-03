@@ -26,7 +26,8 @@ button { touch-action: manipulation; }
 .app { min-height: 100vh; display: grid; grid-template-rows: 56px 1fr; }
 .topbar {
   height: 56px; display: flex; align-items: center; justify-content: space-between;
-  padding: 0 22px; border-bottom: 1px solid var(--line); background: rgba(251,250,247,0.86);
+  padding: 0 max(22px, env(safe-area-inset-right)) 0 max(22px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--line); background: rgba(251,250,247,0.86);
 }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand-mark {
@@ -193,10 +194,13 @@ button { touch-action: manipulation; }
   .status-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .board-wrap { width: min(100%, 760px); }
 }
-@media (max-width: 640px) {
+@media (max-width: 640px), (max-height: 480px) and (orientation: landscape) {
   body.drawer-open { overflow: hidden; }
   .app { grid-template-rows: auto 1fr; }
-  .topbar { height: auto; min-height: 54px; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px; padding: 9px 10px; }
+  .topbar {
+    height: auto; min-height: 54px; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px;
+    padding: max(9px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 9px max(10px, env(safe-area-inset-left));
+  }
   .brand { justify-content: space-between; }
   .brand h1 { font-size: 16px; }
   .mobile-drawer-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; justify-self: end; width: 142px; }
@@ -215,6 +219,7 @@ button { touch-action: manipulation; }
     position: fixed; top: 0; bottom: 0; z-index: 50; width: min(86vw, 340px); max-width: 340px;
     overflow: auto; border-radius: 0; background: rgba(251,250,247,0.98);
     box-shadow: 0 18px 42px rgba(31,25,20,0.28); transition: transform 180ms ease;
+    overscroll-behavior: contain;
   }
   .panel.left { left: 0; transform: translateX(-104%); }
   .panel.right { right: 0; transform: translateX(104%); }
@@ -259,4 +264,52 @@ button { touch-action: manipulation; }
   .rec-main span { font-size: 11px; }
   .moves { grid-template-columns: 30px 1fr 1fr; column-gap: 6px; font-size: 11px; }
   .pv { max-height: 84px; }
+}
+
+@media (max-width: 380px) {
+  .topbar {
+    gap: 6px;
+    padding: max(7px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 7px max(8px, env(safe-area-inset-left));
+  }
+  .brand-mark { width: 26px; height: 26px; font-size: 14px; }
+  .brand h1 { font-size: 15px; }
+  .mobile-drawer-actions { width: 132px; gap: 5px; }
+  .drawer-tab { min-height: 32px; padding: 0 9px; }
+  .engine-pill { padding: 6px 9px; }
+  .workspace { padding: 6px; gap: 7px; }
+  .board-shell { padding: 7px; }
+  .board-top { gap: 6px; padding-bottom: 6px; }
+  .score-line { gap: 6px; }
+  .turn { min-width: 78px; font-size: 12px; }
+  .clock { min-width: 58px; padding: 5px 6px; }
+  .wdl div { min-height: 26px; font-size: 10px; }
+  .board-stage { padding-top: 0; }
+  .mobile-board-actions { gap: 7px; padding-top: 8px; }
+  .icon-btn, .cmd-btn { min-height: 40px; }
+  .tool-label { font-size: 10px; }
+  .mobile-status-grid { gap: 6px; }
+  .mobile-status-grid .stat { padding: 7px 8px; }
+  .mobile-status-grid .stat span { font-size: 10px; }
+  .mobile-status-grid .stat strong { margin-top: 1px; font-size: 13px; }
+}
+
+@media (max-height: 480px) and (orientation: landscape) {
+  .topbar {
+    grid-template-columns: auto auto 1fr; min-height: 44px;
+    padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 6px max(8px, env(safe-area-inset-left));
+  }
+  .mobile-drawer-actions { grid-column: 2; width: 132px; }
+  .engine-pill { grid-column: 3; padding: 6px 9px; }
+  .workspace { padding: 6px; }
+  .board-shell { max-width: min(100%, 760px); margin: 0 auto; padding: 7px; }
+  .board-top { grid-template-columns: 1fr 1fr; align-items: center; gap: 6px; padding-bottom: 5px; }
+  .score-line { gap: 6px; }
+  .wdl { gap: 3px; }
+  .board-stage { padding-top: 0; }
+  .board-wrap { width: min(52vh, 58vw); }
+  .mobile-board-actions { grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) minmax(220px, 1fr); align-items: end; gap: 7px; padding-top: 7px; }
+  .mobile-board-actions .toolbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mobile-delegate-actions { grid-template-columns: 1fr 1fr; }
+  .mobile-status-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .mobile-status-grid .stat { padding: 7px 8px; }
 }

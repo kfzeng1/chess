@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "test:frontend": "playwright test --reporter=list"
+    "test:frontend": "playwright test --reporter=list",
+    "screenshot:mobile": "node tools/mobile-screenshots.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1"

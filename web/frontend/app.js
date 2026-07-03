@@ -588,12 +588,20 @@ function showError(error) {
 
 function closeDrawers() {
   document.body.classList.remove("drawer-open", "drawer-left-open", "drawer-right-open");
+  document.querySelectorAll("[data-open-drawer]").forEach((button) => {
+    button.setAttribute("aria-expanded", "false");
+  });
 }
 
 function openDrawer(side) {
   document.body.classList.toggle("drawer-left-open", side === "left");
   document.body.classList.toggle("drawer-right-open", side === "right");
   document.body.classList.add("drawer-open");
+  document.querySelectorAll("[data-open-drawer]").forEach((button) => {
+    button.setAttribute("aria-expanded", button.dataset.openDrawer === side ? "true" : "false");
+  });
+  const panel = document.getElementById(side === "left" ? "controlsPanel" : "analysisPanel");
+  panel?.focus({ preventScroll: true });
 }
 
 function startNewGame() {
@@ -646,6 +654,9 @@ function bindControls() {
   });
   document.querySelectorAll("[data-close-drawer]").forEach((button) => {
     button.addEventListener("click", closeDrawers);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeDrawers();
   });
   [el.autoMode, el.autoModeMobile].forEach((button) => {
     button.addEventListener("click", () => {
