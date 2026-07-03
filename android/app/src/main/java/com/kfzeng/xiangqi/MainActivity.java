@@ -129,7 +129,7 @@ public class MainActivity extends Activity {
 
         LinearLayout boardShell = new LinearLayout(this);
         boardShell.setOrientation(LinearLayout.VERTICAL);
-        boardShell.setPadding(dp(8), dp(8), dp(8), dp(8));
+        boardShell.setPadding(dp(6), dp(8), dp(6), dp(8));
         boardShell.setBackground(makeRound(0xfffbfaf7, 0xffd2c7b8, dp(8)));
         content.addView(boardShell, new LinearLayout.LayoutParams(-1, -2));
 
@@ -163,9 +163,9 @@ public class MainActivity extends Activity {
             analyzePosition(false);
         });
         int boardWidth = Math.max(dp(300), getResources().getDisplayMetrics().widthPixels - dp(32));
-        int boardHeight = Math.round(boardWidth * 2000f / 1800f);
+        int boardHeight = Math.round(boardWidth * BoardView.CROP_ASPECT);
         LinearLayout.LayoutParams boardLp = new LinearLayout.LayoutParams(-1, boardHeight);
-        boardLp.topMargin = dp(8);
+        boardLp.topMargin = dp(6);
         boardShell.addView(boardView, boardLp);
 
         LinearLayout icons = new LinearLayout(this);
@@ -206,19 +206,11 @@ public class MainActivity extends Activity {
         addGrid(stats, blackClock, 1);
         boardShell.addView(stats);
 
-        LinearLayout preview = new LinearLayout(this);
-        preview.setOrientation(LinearLayout.VERTICAL);
-        preview.setPadding(dp(10), dp(9), dp(10), dp(10));
-        preview.setBackground(makeRound(0xfffffdf8, 0xffe2d9ce, dp(8)));
-        LinearLayout.LayoutParams previewLp = new LinearLayout.LayoutParams(-1, -2);
-        previewLp.topMargin = dp(8);
-        content.addView(preview, previewLp);
-        TextView previewTitle = text("AI 分析", 13, 0xff29241f, true);
-        preview.addView(previewTitle, new LinearLayout.LayoutParams(-1, dp(24)));
         analysisText = text("正在启动离线 Pikafish。", 13, 0xff766b5f, false);
         analysisText.setPadding(dp(10), dp(10), dp(10), dp(10));
         analysisText.setBackground(makeRound(0xfff4efe7, 0xffe2d9ce, dp(7)));
-        preview.addView(analysisText, new LinearLayout.LayoutParams(-1, -2));
+        // Kept for dialog state updates; hidden on the main screen to match the mobile layout.
+        analysisText.setVisibility(View.GONE);
 
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         return root;
@@ -603,6 +595,11 @@ public class MainActivity extends Activity {
     }
 
     public static class BoardView extends View {
+        static final float CROP_LEFT = 120f;
+        static final float CROP_TOP = 120f;
+        static final float CROP_RIGHT = 1680f;
+        static final float CROP_BOTTOM = 1880f;
+        static final float CROP_ASPECT = (CROP_BOTTOM - CROP_TOP) / (CROP_RIGHT - CROP_LEFT);
         private final GameState game;
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Map<String, Bitmap> bitmaps = new HashMap<>();
@@ -632,11 +629,28 @@ public class MainActivity extends Activity {
         @Override protected void onDraw(Canvas canvas) {
             float w = getWidth();
             float h = getHeight();
-            RectF dst = new RectF(0, 0, w, h);
-            canvas.drawBitmap(board, null, dst, paint);
+            float targetAspect = CROP_ASPECT;
+            float drawW = w;
+            float drawH = drawW * targetAspect;
+            if (drawH > h) {
+                drawH = h;
+                drawW = drawH / targetAspect;
+            }
+            float left = (w - drawW) / 2f;
+            float top = (h - drawH) / 2f;
+            RectF dst = new RectF(left, top, left + drawW, top + drawH);
+            android.graphics.Rect src = new android.graphics.Rect(
+                    Math.round(CROP_LEFT), Math.round(CROP_TOP),
+                    Math.round(CROP_RIGHT), Math.round(CROP_BOTTOM));
+            canvas.drawBitmap(board, src, dst, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(1);
+            paint.setColor(0xffd2c7b8);
+            canvas.drawRoundRect(dst, 4, 4, paint);
+            paint.setStyle(Paint.Style.FILL);
             for (Map.Entry<String, Piece> entry : game.board.entrySet()) {
                 float[] xy = point(entry.getKey(), w, h);
-                float size = w * 0.082f;
+                float size = drawW * 0.095f;
                 Bitmap bmp = bitmaps.get(entry.getValue().side + "_" + entry.getValue().role);
                 if (bmp != null) canvas.drawBitmap(bmp, null, new RectF(xy[0]-size/2, xy[1]-size/2, xy[0]+size/2, xy[1]+size/2), paint);
                 if (entry.getKey().equals(selected)) {
@@ -675,7 +689,20 @@ public class MainActivity extends Activity {
             int file = GameState.FILES.indexOf(square.charAt(0));
             int rank = Character.digit(square.charAt(1), 10);
             if (flipped) { file = 8 - file; rank = 9 - rank; }
-            return new float[] { (278 + file * 156) / 1800f * w, (298 + (9 - rank) * 156) / 2000f * h };
+            float targetAspect = CROP_ASPECT;
+            float drawW = w;
+            float drawH = drawW * targetAspect;
+            if (drawH > h) {
+                drawH = h;
+                drawW = drawH / targetAspect;
+            }
+            float left = (w - drawW) / 2f;
+            float top = (h - drawH) / 2f;
+            float rawX = 278 + file * 156;
+            float rawY = 298 + (9 - rank) * 156;
+            float x = left + (rawX - CROP_LEFT) / (CROP_RIGHT - CROP_LEFT) * drawW;
+            float y = top + (rawY - CROP_TOP) / (CROP_BOTTOM - CROP_TOP) * drawH;
+            return new float[] { x, y };
         }
 
         private String nearestSquare(float x, float y, float w, float h) {
