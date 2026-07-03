@@ -53,7 +53,7 @@ public class MainActivity extends Activity {
     private TextView roundStat;
     private TextView redClock;
     private TextView blackClock;
-    private TextView analysisText;
+    private String analysisSummary = "正在启动离线 Pikafish。";
     private Button autoButton;
     private Button manualAiButton;
     private PikafishEngine engine;
@@ -64,7 +64,8 @@ public class MainActivity extends Activity {
     private boolean flipped = false;
     private boolean engineBusy = false;
     private int analysisSerial = 0;
-    private int aiMoveTimeMs = 1000;
+    private int redAiMoveTimeMs = 1000;
+    private int blackAiMoveTimeMs = 1000;
     private int delegateDelayMs = 1000;
     private boolean notationUci = false;
 
@@ -88,25 +89,26 @@ public class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(0xffece7de);
+        root.setPadding(0, statusBarHeight(), 0, 0);
 
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setOrientation(LinearLayout.HORIZONTAL);
-        top.setPadding(dp(10), dp(8), dp(10), dp(6));
+        top.setPadding(dp(10), dp(6), dp(10), dp(4));
         TextView mark = text("象", 15, 0xfffff3df, true);
         mark.setGravity(Gravity.CENTER);
         mark.setBackground(makeRound(0xffc7352d, 0xff8e1f1b, dp(15)));
-        top.addView(mark, new LinearLayout.LayoutParams(dp(30), dp(30)));
-        TextView title = text("象棋 AI 对弈", 17, 0xff29241f, true);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, dp(38), 1);
+        top.addView(mark, new LinearLayout.LayoutParams(dp(28), dp(28)));
+        TextView title = text("象棋 AI 对弈", 16, 0xff29241f, true);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, dp(34), 1);
         titleLp.leftMargin = dp(10);
         top.addView(title, titleLp);
         Button config = smallButton("配置");
         config.setOnClickListener(v -> showConfigDialog());
-        top.addView(config, new LinearLayout.LayoutParams(dp(66), dp(36)));
+        top.addView(config, new LinearLayout.LayoutParams(dp(62), dp(34)));
         Button analysis = smallButton("分析");
         analysis.setOnClickListener(v -> showAnalysisDialog());
-        LinearLayout.LayoutParams analysisLp = new LinearLayout.LayoutParams(dp(66), dp(36));
+        LinearLayout.LayoutParams analysisLp = new LinearLayout.LayoutParams(dp(62), dp(34));
         analysisLp.leftMargin = dp(6);
         top.addView(analysis, analysisLp);
         root.addView(top);
@@ -115,7 +117,7 @@ public class MainActivity extends Activity {
         engineStatus.setGravity(Gravity.CENTER_VERTICAL);
         engineStatus.setPadding(dp(10), 0, dp(10), 0);
         engineStatus.setBackground(makeRound(0xffffffff, 0xffd2c7b8, dp(18)));
-        LinearLayout.LayoutParams engineLp = new LinearLayout.LayoutParams(-1, dp(34));
+        LinearLayout.LayoutParams engineLp = new LinearLayout.LayoutParams(-1, dp(30));
         engineLp.leftMargin = dp(10);
         engineLp.rightMargin = dp(10);
         root.addView(engineStatus, engineLp);
@@ -124,23 +126,23 @@ public class MainActivity extends Activity {
         scroll.setFillViewport(false);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(8), dp(8), dp(8), dp(12));
+        content.setPadding(dp(8), dp(6), dp(8), dp(10));
         scroll.addView(content);
 
         LinearLayout boardShell = new LinearLayout(this);
         boardShell.setOrientation(LinearLayout.VERTICAL);
-        boardShell.setPadding(dp(6), dp(8), dp(6), dp(8));
+        boardShell.setPadding(dp(6), dp(6), dp(6), dp(7));
         boardShell.setBackground(makeRound(0xfffbfaf7, 0xffd2c7b8, dp(8)));
         content.addView(boardShell, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout statusLine = new LinearLayout(this);
         statusLine.setGravity(Gravity.CENTER_VERTICAL);
         turnText = text("红方回合", 15, 0xff29241f, true);
-        statusLine.addView(turnText, new LinearLayout.LayoutParams(0, dp(38), 1));
+        statusLine.addView(turnText, new LinearLayout.LayoutParams(0, dp(34), 1));
         moveCountText = chip("0 步");
-        statusLine.addView(moveCountText, new LinearLayout.LayoutParams(dp(72), dp(34)));
+        statusLine.addView(moveCountText, new LinearLayout.LayoutParams(dp(66), dp(30)));
         thinkingText = chip("待命");
-        LinearLayout.LayoutParams thinkLp = new LinearLayout.LayoutParams(dp(72), dp(34));
+        LinearLayout.LayoutParams thinkLp = new LinearLayout.LayoutParams(dp(66), dp(30));
         thinkLp.leftMargin = dp(6);
         statusLine.addView(thinkingText, thinkLp);
         boardShell.addView(statusLine);
@@ -153,8 +155,8 @@ public class MainActivity extends Activity {
         addGrid(wdlGrid, redWdl, 1);
         addGrid(wdlGrid, drawWdl, 1);
         addGrid(wdlGrid, blackWdl, 1);
-        LinearLayout.LayoutParams wdlLp = new LinearLayout.LayoutParams(-1, dp(36));
-        wdlLp.topMargin = dp(2);
+        LinearLayout.LayoutParams wdlLp = new LinearLayout.LayoutParams(-1, dp(30));
+        wdlLp.topMargin = dp(1);
         boardShell.addView(wdlGrid, wdlLp);
 
         boardView = new BoardView(this, game);
@@ -163,22 +165,23 @@ public class MainActivity extends Activity {
             analyzePosition(false);
         });
         int boardWidth = Math.max(dp(300), getResources().getDisplayMetrics().widthPixels - dp(32));
-        int boardHeight = Math.round(boardWidth * BoardView.CROP_ASPECT);
+        int maxBoardHeight = Math.max(dp(340), getResources().getDisplayMetrics().heightPixels - dp(390));
+        int boardHeight = Math.min(Math.round(boardWidth * BoardView.CROP_ASPECT), maxBoardHeight);
         LinearLayout.LayoutParams boardLp = new LinearLayout.LayoutParams(-1, boardHeight);
-        boardLp.topMargin = dp(6);
+        boardLp.topMargin = dp(4);
         boardShell.addView(boardView, boardLp);
 
         LinearLayout icons = new LinearLayout(this);
         icons.setOrientation(LinearLayout.HORIZONTAL);
-        icons.setPadding(0, dp(8), 0, 0);
-        icons.addView(iconAction("↻", "新局", v -> newGame()), new LinearLayout.LayoutParams(0, dp(64), 1));
-        icons.addView(iconAction("↶", "悔棋", v -> undo()), new LinearLayout.LayoutParams(0, dp(64), 1));
-        icons.addView(iconAction("⇅", "翻转", v -> flip()), new LinearLayout.LayoutParams(0, dp(64), 1));
+        icons.setPadding(0, dp(6), 0, 0);
+        icons.addView(iconAction("↻", "新局", v -> newGame()), new LinearLayout.LayoutParams(0, dp(56), 1));
+        icons.addView(iconAction("↶", "悔棋", v -> undo()), new LinearLayout.LayoutParams(0, dp(56), 1));
+        icons.addView(iconAction("⇅", "翻转", v -> flip()), new LinearLayout.LayoutParams(0, dp(56), 1));
         boardShell.addView(icons);
 
         LinearLayout delegated = new LinearLayout(this);
         delegated.setOrientation(LinearLayout.HORIZONTAL);
-        delegated.setPadding(0, dp(8), 0, 0);
+        delegated.setPadding(0, dp(6), 0, 0);
         autoButton = actionButton("自动代走：开", 0xffc7352d);
         autoButton.setOnClickListener(v -> {
             autoMode = !autoMode;
@@ -187,15 +190,15 @@ public class MainActivity extends Activity {
         });
         manualAiButton = actionButton("本步 AI", 0xff287f83);
         manualAiButton.setOnClickListener(v -> playAiMove());
-        delegated.addView(autoButton, new LinearLayout.LayoutParams(0, dp(46), 1));
-        LinearLayout.LayoutParams manualLp = new LinearLayout.LayoutParams(0, dp(46), 1);
+        delegated.addView(autoButton, new LinearLayout.LayoutParams(0, dp(42), 1));
+        LinearLayout.LayoutParams manualLp = new LinearLayout.LayoutParams(0, dp(42), 1);
         manualLp.leftMargin = dp(8);
         delegated.addView(manualAiButton, manualLp);
         boardShell.addView(delegated);
 
         GridLayout stats = new GridLayout(this);
         stats.setColumnCount(2);
-        stats.setPadding(0, dp(8), 0, 0);
+        stats.setPadding(0, dp(6), 0, 0);
         turnStat = statBox("当前方", "红方");
         roundStat = statBox("回合数", "0");
         redClock = statBox("红方用时", "00:00");
@@ -205,12 +208,6 @@ public class MainActivity extends Activity {
         addGrid(stats, redClock, 1);
         addGrid(stats, blackClock, 1);
         boardShell.addView(stats);
-
-        analysisText = text("正在启动离线 Pikafish。", 13, 0xff766b5f, false);
-        analysisText.setPadding(dp(10), dp(10), dp(10), dp(10));
-        analysisText.setBackground(makeRound(0xfff4efe7, 0xffe2d9ce, dp(7)));
-        // Kept for dialog state updates; hidden on the main screen to match the mobile layout.
-        analysisText.setVisibility(View.GONE);
 
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         return root;
@@ -225,11 +222,14 @@ public class MainActivity extends Activity {
             delegateDelayMs = value;
             return String.format(Locale.US, "%.1fs", value / 1000f);
         }));
-        body.addView(sliderRow("AI 用时", "每步 Pikafish 搜索时间", 100, 5000, 100, aiMoveTimeMs, value -> {
-            aiMoveTimeMs = value;
-            return String.format(Locale.US, "%.1fs", value / 1000f);
+        body.addView(sliderRow("红方 AI 搜索", "红方走棋时使用的 Pikafish 时间", 100, 5000, 100, redAiMoveTimeMs, value -> {
+            redAiMoveTimeMs = value;
+            return String.format(Locale.US, "%.1fs · go movetime %d", value / 1000f, value);
         }));
-        body.addView(toggleRow("着法显示", "UCI", notationUci, value -> { notationUci = value; refreshUi(); renderAnalysisText(); }));
+        body.addView(sliderRow("黑方 AI 搜索", "黑方走棋时使用的 Pikafish 时间", 100, 5000, 100, blackAiMoveTimeMs, value -> {
+            blackAiMoveTimeMs = value;
+            return String.format(Locale.US, "%.1fs · go movetime %d", value / 1000f, value);
+        }));
         body.addView(section("引擎", "Pikafish dev-20260628-553282ed / Android arm64"));
         dialog.show();
     }
@@ -237,12 +237,17 @@ public class MainActivity extends Activity {
     private void showAnalysisDialog() {
         Dialog dialog = sideDialog(Gravity.END, "AI 分析");
         LinearLayout body = dialog.findViewById(1001);
-        body.addView(section("主变", lastAnalysis == null ? "正在分析" : lastAnalysis.pvText(notationUci)));
+        body.addView(notationRow(() -> {
+            dialog.dismiss();
+            showAnalysisDialog();
+        }));
+        body.addView(analysisCard("当前结论", analysisSummary, 0xff287f83, true));
+        body.addView(analysisCard("主变", lastAnalysis == null ? "正在分析" : lastAnalysis.pvText(notationUci), 0xff8b5b28, false));
         String best = lastAnalysis == null ? "正在分析" : lastAnalysis.bestMoveText(notationUci);
         String score = lastAnalysis == null || lastAnalysis.scoreText.isEmpty() ? "等待分数" : lastAnalysis.scoreText;
-        body.addView(section("推荐着法", best + "\n" + score));
-        body.addView(section("走法记录", game.movesText(notationUci)));
-        body.addView(section("说明", "score 正数为红方优势。WDL 顺序为红胜、和棋、黑胜。"));
+        body.addView(analysisCard("推荐着法", best + "\n" + score, 0xffc7352d, true));
+        body.addView(analysisCard("走法记录", game.movesText(notationUci), 0xff4b433a, false));
+        body.addView(analysisCard("说明", "分数始终按红方视角显示：红方 +0.24 表示红方略优，黑方 +0.24 表示黑方略优。WDL 为红胜、和棋、黑胜。", 0xff766b5f, false));
         dialog.show();
     }
 
@@ -292,6 +297,56 @@ public class MainActivity extends Activity {
         return view;
     }
 
+    private View notationRow(Runnable redraw) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(10), dp(8), dp(10), dp(8));
+        row.setBackground(makeRound(0xfff4efe7, 0xffe2d9ce, dp(8)));
+        TextView label = text("着法显示", 14, 0xff29241f, true);
+        row.addView(label, new LinearLayout.LayoutParams(0, dp(38), 1));
+        Button readable = smallButton("用户着法");
+        Button uci = smallButton("UCI 坐标");
+        View.OnClickListener listener = v -> {
+            notationUci = v == uci;
+            renderAnalysisText();
+            redraw.run();
+        };
+        readable.setOnClickListener(listener);
+        uci.setOnClickListener(listener);
+        readable.setTextColor(!notationUci ? 0xffffffff : 0xff29241f);
+        readable.setBackground(makeRound(!notationUci ? 0xff287f83 : 0xffffffff, 0xffd2c7b8, dp(7)));
+        uci.setTextColor(notationUci ? 0xffffffff : 0xff29241f);
+        uci.setBackground(makeRound(notationUci ? 0xff287f83 : 0xffffffff, 0xffd2c7b8, dp(7)));
+        row.addView(readable, new LinearLayout.LayoutParams(dp(88), dp(36)));
+        LinearLayout.LayoutParams uciLp = new LinearLayout.LayoutParams(dp(82), dp(36));
+        uciLp.leftMargin = dp(6);
+        row.addView(uci, uciLp);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.bottomMargin = dp(10);
+        row.setLayoutParams(lp);
+        return row;
+    }
+
+    private View analysisCard(String title, String value, int accent, boolean important) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(10), dp(9), dp(10), dp(10));
+        card.setBackground(makeRound(0xffffffff, 0xffe2d9ce, dp(8)));
+        TextView titleView = text(title, 12, accent, true);
+        titleView.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(titleView, new LinearLayout.LayoutParams(-1, dp(22)));
+        TextView valueView = text(value == null || value.isEmpty() ? "无" : value, important ? 16 : 14, 0xff29241f, important);
+        valueView.setGravity(Gravity.START);
+        valueView.setLineSpacing(dp(2), 1.0f);
+        LinearLayout.LayoutParams valueLp = new LinearLayout.LayoutParams(-1, -2);
+        valueLp.topMargin = dp(2);
+        card.addView(valueView, valueLp);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.bottomMargin = dp(9);
+        card.setLayoutParams(lp);
+        return card;
+    }
+
     private View toggleRow(String title, String suffix, boolean checked, ToggleSetter setter) {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -299,18 +354,34 @@ public class MainActivity extends Activity {
         row.setBackground(makeRound(0xffffffff, 0xffe2d9ce, dp(8)));
         TextView label = text(title, 14, 0xff29241f, true);
         row.addView(label, new LinearLayout.LayoutParams(0, dp(42), 1));
-        Button button = smallButton((checked ? "开启 " : "关闭 ") + suffix);
-        button.setTextColor(checked ? 0xffffffff : 0xff29241f);
-        button.setBackground(makeRound(checked ? 0xff287f83 : 0xffffffff, 0xffd2c7b8, dp(7)));
+        LinearLayout segmented = new LinearLayout(this);
+        segmented.setOrientation(LinearLayout.HORIZONTAL);
+        segmented.setPadding(dp(3), dp(3), dp(3), dp(3));
+        segmented.setBackground(makeRound(0xfff4efe7, 0xffd2c7b8, dp(8)));
+        Button human = smallButton("人类");
+        Button ai = smallButton(suffix);
         final boolean[] value = new boolean[] { checked };
-        button.setOnClickListener(v -> {
-            value[0] = !value[0];
-            button.setText((value[0] ? "开启 " : "关闭 ") + suffix);
-            button.setTextColor(value[0] ? 0xffffffff : 0xff29241f);
-            button.setBackground(makeRound(value[0] ? 0xff287f83 : 0xffffffff, 0xffd2c7b8, dp(7)));
-            setter.set(value[0]);
+        int activeColor = title.contains("红") ? 0xffc7352d : 0xff282522;
+        Runnable paintButtons = () -> {
+            human.setTextColor(!value[0] ? 0xffffffff : 0xff766b5f);
+            human.setBackground(makeRound(!value[0] ? activeColor : 0x00ffffff, !value[0] ? activeColor : 0x00ffffff, dp(6)));
+            ai.setTextColor(value[0] ? 0xffffffff : 0xff766b5f);
+            ai.setBackground(makeRound(value[0] ? activeColor : 0x00ffffff, value[0] ? activeColor : 0x00ffffff, dp(6)));
+        };
+        human.setOnClickListener(v -> {
+            value[0] = false;
+            paintButtons.run();
+            setter.set(false);
         });
-        row.addView(button, new LinearLayout.LayoutParams(dp(112), dp(38)));
+        ai.setOnClickListener(v -> {
+            value[0] = true;
+            paintButtons.run();
+            setter.set(true);
+        });
+        paintButtons.run();
+        segmented.addView(human, new LinearLayout.LayoutParams(dp(76), dp(34)));
+        segmented.addView(ai, new LinearLayout.LayoutParams(dp(76), dp(34)));
+        row.addView(segmented, new LinearLayout.LayoutParams(dp(158), dp(40)));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.bottomMargin = dp(8);
         row.setLayoutParams(lp);
@@ -350,6 +421,7 @@ public class MainActivity extends Activity {
         analysisSerial++;
         game.reset();
         lastAnalysis = null;
+        analysisSummary = "等待重新分析。";
         boardView.clearSelection();
         refreshUi();
         analyzePosition(false);
@@ -359,6 +431,7 @@ public class MainActivity extends Activity {
         analysisSerial++;
         game.undo();
         lastAnalysis = null;
+        analysisSummary = "等待重新分析。";
         boardView.clearSelection();
         refreshUi();
         analyzePosition(false);
@@ -381,10 +454,10 @@ public class MainActivity extends Activity {
         thinkingText.setText(playBestMove ? "代走" : "分析");
         manualAiButton.setEnabled(false);
         autoButton.setEnabled(false);
-        analysisText.setText("Pikafish 正在计算...");
+        analysisSummary = "Pikafish 正在计算...";
         new Thread(() -> {
             try {
-                AnalysisResult result = getEngine().analyze(moves, aiMoveTimeMs);
+                AnalysisResult result = getEngine().analyze(moves, currentAiMoveTimeMs());
                 runOnUiThread(() -> applyAnalysis(serial, result, playBestMove));
             } catch (Exception ex) {
                 runOnUiThread(() -> {
@@ -393,10 +466,14 @@ public class MainActivity extends Activity {
                     thinkingText.setText("异常");
                     manualAiButton.setEnabled(true);
                     autoButton.setEnabled(true);
-                    analysisText.setText("分析失败：" + ex.getMessage());
+                    analysisSummary = "分析失败：" + ex.getMessage();
                 });
             }
         }).start();
+    }
+
+    private int currentAiMoveTimeMs() {
+        return "red".equals(game.sideToMove()) ? redAiMoveTimeMs : blackAiMoveTimeMs;
     }
 
     private PikafishEngine getEngine() throws IOException {
@@ -440,7 +517,7 @@ public class MainActivity extends Activity {
 
     private void renderAnalysisText() {
         if (lastAnalysis == null) return;
-        analysisText.setText(lastAnalysis.summary(notationUci));
+        analysisSummary = lastAnalysis.summary(notationUci);
     }
 
     private void maybeAutoMove() {
@@ -458,7 +535,7 @@ public class MainActivity extends Activity {
     private boolean scheduleBestMove(int serial, String bestMove, boolean requireAutoCheck) {
         if (bestMove == null || bestMove.length() != 4) return false;
         if (!game.legalMoves().contains(bestMove)) {
-            analysisText.setText("AI 返回不合法着法，已停止代走：" + bestMove);
+            analysisSummary = "AI 返回不合法着法，已停止代走：" + bestMove;
             autoMode = false;
             refreshUi();
             return false;
@@ -479,6 +556,7 @@ public class MainActivity extends Activity {
             game.applyMove(bestMove);
             boardView.clearSelection();
             lastAnalysis = null;
+            analysisSummary = "等待重新分析。";
             refreshUi();
             analyzePosition(false);
         }, delegateDelayMs);
@@ -531,8 +609,8 @@ public class MainActivity extends Activity {
     }
 
     private TextView statBox(String title, String value) {
-        TextView t = text(title + "\n" + value, 13, 0xff29241f, true);
-        t.setPadding(dp(10), dp(7), dp(10), dp(7));
+        TextView t = text(title + "\n" + value, 12, 0xff29241f, true);
+        t.setPadding(dp(9), dp(5), dp(9), dp(5));
         t.setBackground(makeRound(0xffffffff, 0xffe2d9ce, dp(7)));
         return t;
     }
@@ -563,21 +641,23 @@ public class MainActivity extends Activity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(4), 0, dp(4), 0);
-        TextView l = text(label, 11, 0xff766b5f, true);
+        TextView l = text(label, 10, 0xff766b5f, true);
         l.setGravity(Gravity.CENTER);
-        box.addView(l, new LinearLayout.LayoutParams(-1, dp(20)));
+        box.addView(l, new LinearLayout.LayoutParams(-1, dp(17)));
         Button b = smallButton(icon);
-        b.setTextSize(22);
+        b.setTextSize(20);
         b.setOnClickListener(listener);
-        box.addView(b, new LinearLayout.LayoutParams(-1, dp(44)));
+        box.addView(b, new LinearLayout.LayoutParams(-1, dp(38)));
         return box;
     }
 
     private void addGrid(GridLayout grid, View child, int weight) {
         GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-        lp.width = 0;
+        int columns = Math.max(1, grid.getColumnCount());
+        int totalWidth = getResources().getDisplayMetrics().widthPixels - dp(28);
+        lp.width = Math.max(dp(64), totalWidth / columns - dp(8));
         lp.height = GridLayout.LayoutParams.WRAP_CONTENT;
-        lp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, weight);
+        lp.columnSpec = GridLayout.spec(GridLayout.UNDEFINED);
         lp.setMargins(dp(4), dp(4), dp(4), dp(4));
         grid.addView(child, lp);
     }
@@ -592,6 +672,11 @@ public class MainActivity extends Activity {
 
     private int dp(int value) {
         return (int)(value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private int statusBarHeight() {
+        int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        return id > 0 ? getResources().getDimensionPixelSize(id) : 0;
     }
 
     public static class BoardView extends View {

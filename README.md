@@ -67,9 +67,9 @@ testing after enabling Android debug/unknown-source installation.
 Recent emulator screenshots were captured for layout review:
 
 ```text
-/tmp/xiangqi-apk-shots/main.png
-/tmp/xiangqi-apk-shots/config.png
-/tmp/xiangqi-apk-shots/analysis.png
+/tmp/xiangqi-apk-shots/android-main-fixed.png
+/tmp/xiangqi-apk-shots/android-config-segmented.png
+/tmp/xiangqi-apk-shots/android-analysis.png
 ```
 
 The local emulator used for screenshots is `x86_64`, while the bundled
