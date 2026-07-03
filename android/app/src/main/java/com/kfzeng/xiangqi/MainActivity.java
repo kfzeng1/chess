@@ -87,20 +87,26 @@ public class MainActivity extends Activity {
         int pad = dp(8);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(pad, pad, pad, pad);
         root.setBackgroundColor(0xffece7de);
 
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setOrientation(LinearLayout.HORIZONTAL);
-        TextView title = text("象棋 AI", 18, 0xff29241f, true);
-        top.addView(title, new LinearLayout.LayoutParams(0, dp(42), 1));
+        top.setPadding(dp(10), dp(8), dp(10), dp(6));
+        TextView mark = text("象", 15, 0xfffff3df, true);
+        mark.setGravity(Gravity.CENTER);
+        mark.setBackground(makeRound(0xffc7352d, 0xff8e1f1b, dp(15)));
+        top.addView(mark, new LinearLayout.LayoutParams(dp(30), dp(30)));
+        TextView title = text("象棋 AI 对弈", 17, 0xff29241f, true);
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, dp(38), 1);
+        titleLp.leftMargin = dp(10);
+        top.addView(title, titleLp);
         Button config = smallButton("配置");
         config.setOnClickListener(v -> showConfigDialog());
-        top.addView(config, new LinearLayout.LayoutParams(dp(74), dp(38)));
+        top.addView(config, new LinearLayout.LayoutParams(dp(66), dp(36)));
         Button analysis = smallButton("分析");
         analysis.setOnClickListener(v -> showAnalysisDialog());
-        LinearLayout.LayoutParams analysisLp = new LinearLayout.LayoutParams(dp(74), dp(38));
+        LinearLayout.LayoutParams analysisLp = new LinearLayout.LayoutParams(dp(66), dp(36));
         analysisLp.leftMargin = dp(6);
         top.addView(analysis, analysisLp);
         root.addView(top);
@@ -109,19 +115,23 @@ public class MainActivity extends Activity {
         engineStatus.setGravity(Gravity.CENTER_VERTICAL);
         engineStatus.setPadding(dp(10), 0, dp(10), 0);
         engineStatus.setBackground(makeRound(0xffffffff, 0xffd2c7b8, dp(18)));
-        root.addView(engineStatus, new LinearLayout.LayoutParams(-1, dp(36)));
+        LinearLayout.LayoutParams engineLp = new LinearLayout.LayoutParams(-1, dp(34));
+        engineLp.leftMargin = dp(10);
+        engineLp.rightMargin = dp(10);
+        root.addView(engineStatus, engineLp);
 
         ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(0, dp(8), 0, dp(8));
+        content.setPadding(dp(8), dp(8), dp(8), dp(12));
         scroll.addView(content);
 
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(10), dp(10), dp(10), dp(10));
-        card.setBackground(makeRound(0xfffbfaf7, 0xffd2c7b8, dp(8)));
-        content.addView(card, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout boardShell = new LinearLayout(this);
+        boardShell.setOrientation(LinearLayout.VERTICAL);
+        boardShell.setPadding(dp(8), dp(8), dp(8), dp(8));
+        boardShell.setBackground(makeRound(0xfffbfaf7, 0xffd2c7b8, dp(8)));
+        content.addView(boardShell, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout statusLine = new LinearLayout(this);
         statusLine.setGravity(Gravity.CENTER_VERTICAL);
@@ -133,7 +143,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams thinkLp = new LinearLayout.LayoutParams(dp(72), dp(34));
         thinkLp.leftMargin = dp(6);
         statusLine.addView(thinkingText, thinkLp);
-        card.addView(statusLine);
+        boardShell.addView(statusLine);
 
         GridLayout wdlGrid = new GridLayout(this);
         wdlGrid.setColumnCount(3);
@@ -143,17 +153,20 @@ public class MainActivity extends Activity {
         addGrid(wdlGrid, redWdl, 1);
         addGrid(wdlGrid, drawWdl, 1);
         addGrid(wdlGrid, blackWdl, 1);
-        card.addView(wdlGrid, new LinearLayout.LayoutParams(-1, dp(36)));
+        LinearLayout.LayoutParams wdlLp = new LinearLayout.LayoutParams(-1, dp(36));
+        wdlLp.topMargin = dp(2);
+        boardShell.addView(wdlGrid, wdlLp);
 
         boardView = new BoardView(this, game);
         boardView.setMoveListener(() -> {
             refreshUi();
             analyzePosition(false);
         });
-        LinearLayout.LayoutParams boardLp = new LinearLayout.LayoutParams(-1, 0);
-        boardLp.height = getResources().getDisplayMetrics().widthPixels;
-        boardLp.topMargin = dp(10);
-        card.addView(boardView, boardLp);
+        int boardWidth = Math.max(dp(300), getResources().getDisplayMetrics().widthPixels - dp(32));
+        int boardHeight = Math.round(boardWidth * 2000f / 1800f);
+        LinearLayout.LayoutParams boardLp = new LinearLayout.LayoutParams(-1, boardHeight);
+        boardLp.topMargin = dp(8);
+        boardShell.addView(boardView, boardLp);
 
         LinearLayout icons = new LinearLayout(this);
         icons.setOrientation(LinearLayout.HORIZONTAL);
@@ -161,7 +174,7 @@ public class MainActivity extends Activity {
         icons.addView(iconAction("↻", "新局", v -> newGame()), new LinearLayout.LayoutParams(0, dp(64), 1));
         icons.addView(iconAction("↶", "悔棋", v -> undo()), new LinearLayout.LayoutParams(0, dp(64), 1));
         icons.addView(iconAction("⇅", "翻转", v -> flip()), new LinearLayout.LayoutParams(0, dp(64), 1));
-        card.addView(icons);
+        boardShell.addView(icons);
 
         LinearLayout delegated = new LinearLayout(this);
         delegated.setOrientation(LinearLayout.HORIZONTAL);
@@ -178,7 +191,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams manualLp = new LinearLayout.LayoutParams(0, dp(46), 1);
         manualLp.leftMargin = dp(8);
         delegated.addView(manualAiButton, manualLp);
-        card.addView(delegated);
+        boardShell.addView(delegated);
 
         GridLayout stats = new GridLayout(this);
         stats.setColumnCount(2);
@@ -191,11 +204,21 @@ public class MainActivity extends Activity {
         addGrid(stats, roundStat, 1);
         addGrid(stats, redClock, 1);
         addGrid(stats, blackClock, 1);
-        card.addView(stats);
+        boardShell.addView(stats);
 
-        analysisText = text("AI 分析：正在启动离线 Pikafish。", 13, 0xff766b5f, false);
+        LinearLayout preview = new LinearLayout(this);
+        preview.setOrientation(LinearLayout.VERTICAL);
+        preview.setPadding(dp(10), dp(9), dp(10), dp(10));
+        preview.setBackground(makeRound(0xfffffdf8, 0xffe2d9ce, dp(8)));
+        LinearLayout.LayoutParams previewLp = new LinearLayout.LayoutParams(-1, -2);
+        previewLp.topMargin = dp(8);
+        content.addView(preview, previewLp);
+        TextView previewTitle = text("AI 分析", 13, 0xff29241f, true);
+        preview.addView(previewTitle, new LinearLayout.LayoutParams(-1, dp(24)));
+        analysisText = text("正在启动离线 Pikafish。", 13, 0xff766b5f, false);
         analysisText.setPadding(dp(10), dp(10), dp(10), dp(10));
-        content.addView(analysisText);
+        analysisText.setBackground(makeRound(0xfff4efe7, 0xffe2d9ce, dp(7)));
+        preview.addView(analysisText, new LinearLayout.LayoutParams(-1, -2));
 
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         return root;
@@ -223,9 +246,11 @@ public class MainActivity extends Activity {
         Dialog dialog = sideDialog(Gravity.END, "AI 分析");
         LinearLayout body = dialog.findViewById(1001);
         body.addView(section("主变", lastAnalysis == null ? "正在分析" : lastAnalysis.pvText(notationUci)));
-        body.addView(section("推荐着法", lastAnalysis == null ? "正在分析" : lastAnalysis.bestMoveText(notationUci)));
+        String best = lastAnalysis == null ? "正在分析" : lastAnalysis.bestMoveText(notationUci);
+        String score = lastAnalysis == null || lastAnalysis.scoreText.isEmpty() ? "等待分数" : lastAnalysis.scoreText;
+        body.addView(section("推荐着法", best + "\n" + score));
         body.addView(section("走法记录", game.movesText(notationUci)));
-        body.addView(section("说明", "当前 APK 离线运行，使用内置 Android arm64 Pikafish 与本地 NNUE。"));
+        body.addView(section("说明", "score 正数为红方优势。WDL 顺序为红胜、和棋、黑胜。"));
         dialog.show();
     }
 
@@ -364,7 +389,7 @@ public class MainActivity extends Activity {
         thinkingText.setText(playBestMove ? "代走" : "分析");
         manualAiButton.setEnabled(false);
         autoButton.setEnabled(false);
-        analysisText.setText("AI 分析：Pikafish 正在计算...");
+        analysisText.setText("Pikafish 正在计算...");
         new Thread(() -> {
             try {
                 AnalysisResult result = getEngine().analyze(moves, aiMoveTimeMs);
@@ -376,7 +401,7 @@ public class MainActivity extends Activity {
                     thinkingText.setText("异常");
                     manualAiButton.setEnabled(true);
                     autoButton.setEnabled(true);
-                    analysisText.setText("AI 分析失败：" + ex.getMessage());
+                    analysisText.setText("分析失败：" + ex.getMessage());
                 });
             }
         }).start();
@@ -423,7 +448,7 @@ public class MainActivity extends Activity {
 
     private void renderAnalysisText() {
         if (lastAnalysis == null) return;
-        analysisText.setText("AI 分析：" + lastAnalysis.summary(notationUci));
+        analysisText.setText(lastAnalysis.summary(notationUci));
     }
 
     private void maybeAutoMove() {
@@ -483,6 +508,8 @@ public class MainActivity extends Activity {
         redClock.setText("红方用时\n--:--");
         blackClock.setText("黑方用时\n--:--");
         autoButton.setText(autoMode ? "自动代走：开" : "自动代走：关");
+        autoButton.setTextColor(autoMode ? 0xffffffff : 0xff29241f);
+        autoButton.setBackground(makeRound(autoMode ? 0xffc7352d : 0xffffffff, autoMode ? 0xff9e322d : 0xffd2c7b8, dp(7)));
         manualAiButton.setEnabled(!engineBusy);
         autoButton.setEnabled(!engineBusy);
         boardView.invalidate();
@@ -513,7 +540,7 @@ public class MainActivity extends Activity {
 
     private TextView statBox(String title, String value) {
         TextView t = text(title + "\n" + value, 13, 0xff29241f, true);
-        t.setPadding(dp(10), dp(6), dp(10), dp(6));
+        t.setPadding(dp(10), dp(7), dp(10), dp(7));
         t.setBackground(makeRound(0xffffffff, 0xffe2d9ce, dp(7)));
         return t;
     }
@@ -524,6 +551,9 @@ public class MainActivity extends Activity {
         b.setTextColor(0xff29241f);
         b.setTextSize(14);
         b.setAllCaps(false);
+        b.setMinHeight(0);
+        b.setMinWidth(0);
+        b.setPadding(dp(8), 0, dp(8), 0);
         b.setBackground(makeRound(0xffffffff, 0xffd2c7b8, dp(7)));
         return b;
     }
