@@ -1,4 +1,4 @@
-.PHONY: run run-fake test screenshot clean
+.PHONY: run run-fake test test-frontend screenshot clean
 
 run:
 	python3 -m web.backend.server
@@ -8,6 +8,9 @@ run-fake:
 
 test:
 	python3 -m unittest discover -s tests -v
+
+test-frontend:
+	npm run test:frontend
 
 screenshot:
 	npx playwright screenshot --viewport-size=1440,960 http://127.0.0.1:8080/ assets/ui-preview.png

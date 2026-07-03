@@ -25,6 +25,7 @@ const state = {
   generation: 0,
   auditLogs: [],
   mismatchCount: 0,
+  mismatchHandling: false,
 };
 
 const el = {
@@ -193,6 +194,44 @@ function renderAudit() {
   )).join("");
 }
 
+function setAutoMode(enabled) {
+  state.autoMode = enabled;
+  el.autoMode.textContent = state.autoMode ? "自动代走：开" : "自动代走：关";
+  el.autoMode.classList.toggle("is-off", !state.autoMode);
+  el.autoMode.setAttribute("aria-pressed", state.autoMode ? "true" : "false");
+  if (!state.autoMode) clearTimeout(state.autoTimer);
+  else scheduleAuto();
+}
+
+async function restoreToMoves(moves) {
+  clearTimeout(state.autoTimer);
+  state.generation += 1;
+  state.moves = [...moves];
+  state.lastMove = state.moves.at(-1) || null;
+  state.selected = null;
+  state.analysis = null;
+  state.analysisKey = "";
+  await syncPosition();
+  await refreshAnalysis();
+}
+
+async function handleMismatch(message, restoreMoves = state.moves) {
+  addAudit(message, true);
+  if (state.mismatchHandling) return;
+  state.mismatchHandling = true;
+  const targetMoves = [...restoreMoves];
+  try {
+    setAutoMode(false);
+    await restoreToMoves(targetMoves);
+    window.alert(`检测到代走不匹配：${message}\n\n已关闭自动代走，并回到触发检查时的局面。`);
+  } catch (error) {
+    console.error(error);
+    window.alert(`检测到代走不匹配：${message}\n\n自动代走已关闭，但回滚局面失败：${error.message}`);
+  } finally {
+    state.mismatchHandling = false;
+  }
+}
+
 function scoreText(line) {
   return line.score?.display || "-";
 }
@@ -325,11 +364,11 @@ async function refreshAnalysis() {
   el.engineStatus.textContent = "Pikafish thinking";
   const data = await api("/api/analyze", { moves: movesSnapshot, positionId: positionIdSnapshot, limit: currentLimit(sideSnapshot), multipv: 5 });
   if (key !== movesKey() || generationSnapshot !== state.generation) {
-    addAudit("丢弃过期分析", true);
+    await handleMismatch("丢弃过期分析", movesSnapshot);
     return false;
   }
   if (data.positionId !== state.positionId) {
-    addAudit("分析 positionId 不匹配", true);
+    await handleMismatch("分析 positionId 不匹配", movesSnapshot);
     return false;
   }
   state.analysis = data;
@@ -343,28 +382,20 @@ async function refreshAnalysis() {
 async function playAiMove() {
   if (state.gameOver) return;
   const generationSnapshot = state.generation;
+  const movesSnapshot = [...state.moves];
   if (!state.analysis || state.analysisKey !== movesKey()) {
     const refreshed = await refreshAnalysis();
     if (!refreshed) return;
   }
   if (generationSnapshot !== state.generation) {
-    addAudit("代走任务过期", true);
+    await handleMismatch("代走任务过期", movesSnapshot);
     return;
   }
   if (state.analysis?.positionId === state.positionId && state.analysis?.bestmove && state.legalMoves.includes(state.analysis.bestmove)) {
     addAudit(`代走 ${state.analysis.bestmove}`);
     await movePiece(state.analysis.bestmove);
   } else if (state.analysis?.bestmove) {
-    addAudit("bestmove 审核失败，重新分析", true);
-    state.analysis = null;
-    state.analysisKey = "";
-    await refreshAnalysis();
-    if (state.analysis?.positionId === state.positionId && state.analysis?.bestmove && state.legalMoves.includes(state.analysis.bestmove)) {
-      addAudit(`代走 ${state.analysis.bestmove}`);
-      await movePiece(state.analysis.bestmove);
-    } else {
-      addAudit("重新分析后仍未通过", true);
-    }
+    await handleMismatch("bestmove 审核失败，重新分析", movesSnapshot);
   }
 }
 
@@ -405,7 +436,7 @@ function showError(error) {
   el.thinking.textContent = "错误";
   el.engineStatus.textContent = error.message;
   if (/positionId|illegal|bestmove|不匹配/i.test(error.message)) {
-    addAudit(error.message, true);
+    handleMismatch(error.message, state.moves);
   }
   console.error(error);
 }
@@ -439,10 +470,7 @@ function bindControls() {
     renderBoard();
   });
   el.autoMode.addEventListener("click", () => {
-    state.autoMode = !state.autoMode;
-    el.autoMode.textContent = state.autoMode ? "自动代走：开" : "自动代走：关";
-    el.autoMode.classList.toggle("is-off", !state.autoMode);
-    scheduleAuto();
+    setAutoMode(!state.autoMode);
   });
   el.manualAi.addEventListener("click", () => playAiMove().catch(showError));
   el.delayRange.addEventListener("input", () => {

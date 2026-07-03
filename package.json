@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "test:frontend": "playwright test tests/frontend_mismatch.spec.js --reporter=list"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}
