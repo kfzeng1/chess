@@ -26,6 +26,7 @@ const state = {
   auditLogs: [],
   mismatchCount: 0,
   mismatchHandling: false,
+  analysisCache: new Map(),
 };
 
 const el = {
@@ -194,6 +195,35 @@ function renderAudit() {
   )).join("");
 }
 
+function searchKey(side = state.sideToMove) {
+  const limit = currentLimit(side);
+  return `${limit.mode}:${limit.value}`;
+}
+
+function analysisCacheKey(positionId = state.positionId, side = state.sideToMove) {
+  return `${positionId}|${side}|${searchKey(side)}|multipv:5`;
+}
+
+function rememberAnalysis(data, key = analysisCacheKey(data.positionId, data.sideToMove)) {
+  if (!data?.positionId || !data?.sideToMove) return;
+  state.analysisCache.set(key, data);
+  if (state.analysisCache.size > 80) {
+    const oldest = state.analysisCache.keys().next().value;
+    state.analysisCache.delete(oldest);
+  }
+}
+
+function restoreCachedAnalysis() {
+  const cached = state.analysisCache.get(analysisCacheKey());
+  if (!cached) return false;
+  state.analysis = cached;
+  state.analysisKey = movesKey();
+  renderAnalysis();
+  el.thinking.textContent = "待命";
+  el.engineStatus.textContent = "Pikafish ready";
+  return true;
+}
+
 function setAutoMode(enabled) {
   state.autoMode = enabled;
   el.autoMode.textContent = state.autoMode ? "自动代走：开" : "自动代走：关";
@@ -212,7 +242,7 @@ async function restoreToMoves(moves) {
   state.analysis = null;
   state.analysisKey = "";
   await syncPosition();
-  await refreshAnalysis();
+  if (!restoreCachedAnalysis()) await refreshAnalysis();
 }
 
 async function handleMismatch(message, restoreMoves = state.moves) {
@@ -364,7 +394,7 @@ async function refreshAnalysis() {
   el.engineStatus.textContent = "Pikafish thinking";
   const data = await api("/api/analyze", { moves: movesSnapshot, positionId: positionIdSnapshot, limit: currentLimit(sideSnapshot), multipv: 5 });
   if (key !== movesKey() || generationSnapshot !== state.generation) {
-    await handleMismatch("丢弃过期分析", movesSnapshot);
+    addAudit("丢弃过期分析");
     return false;
   }
   if (data.positionId !== state.positionId) {
@@ -373,6 +403,7 @@ async function refreshAnalysis() {
   }
   state.analysis = data;
   state.analysisKey = key;
+  rememberAnalysis(data);
   renderAnalysis();
   el.thinking.textContent = "待命";
   el.engineStatus.textContent = "Pikafish ready";
@@ -388,7 +419,7 @@ async function playAiMove() {
     if (!refreshed) return;
   }
   if (generationSnapshot !== state.generation) {
-    await handleMismatch("代走任务过期", movesSnapshot);
+    addAudit("代走任务过期");
     return;
   }
   if (state.analysis?.positionId === state.positionId && state.analysis?.bestmove && state.legalMoves.includes(state.analysis.bestmove)) {
@@ -450,6 +481,7 @@ function bindControls() {
     state.lastMove = null;
     state.analysis = null;
     state.analysisKey = "";
+    state.analysisCache.clear();
     state.clocks = { red: 0, black: 0 };
     state.lastClockTick = Date.now();
     resetAudit();
@@ -463,7 +495,10 @@ function bindControls() {
     state.lastMove = state.moves.at(-1) || null;
     state.analysis = null;
     state.analysisKey = "";
-    syncPosition().then(() => refreshAnalysis()).then(() => scheduleAuto()).catch(showError);
+    syncPosition().then(() => {
+      if (restoreCachedAnalysis()) return true;
+      return refreshAnalysis();
+    }).then(() => scheduleAuto()).catch(showError);
   });
   document.getElementById("flipBoard").addEventListener("click", () => {
     state.flipped = !state.flipped;
@@ -496,6 +531,11 @@ function bindControls() {
       const side = tabs.dataset.aiModeTabs;
       state.aiSearch[side].mode = button.dataset.aiMode;
       updateAiSearch(side);
+      if (side === state.sideToMove) {
+        state.analysis = null;
+        state.analysisKey = "";
+        restoreCachedAnalysis();
+      }
     });
   });
   document.querySelectorAll("[data-ai-range]").forEach((range) => {
@@ -505,6 +545,11 @@ function bindControls() {
       if (config.mode === "movetime") config.movetime = Number(range.value);
       else config.depth = Number(range.value);
       updateAiSearch(side);
+      if (side === state.sideToMove) {
+        state.analysis = null;
+        state.analysisKey = "";
+        restoreCachedAnalysis();
+      }
     });
   });
   document.querySelectorAll("[data-notation-mode]").forEach((button) => {
