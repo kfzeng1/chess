@@ -16,12 +16,13 @@ ENGINE_PATH = ROOT / "engines" / "pikafish-avxvnni"
 ENGINE_CWD = ROOT / "engines"
 
 INFO_RE = re.compile(r"\bmultipv\s+(\d+)\b")
-SCORE_RE = re.compile(r"\bscore\s+(cp|mate)\s+(-?\d+)\b")
+SCORE_RE = re.compile(r"\bscore\s+(cp|mate)\s+(-?\d+)(?:\s+(lowerbound|upperbound))?\b")
 WDL_RE = re.compile(r"\bwdl\s+(\d+)\s+(\d+)\s+(\d+)\b")
-PV_RE = re.compile(r"\bpv\s+(.+)$")
+PV_RE = re.compile(r"\bpv(?:\s+(.*))?$")
 DEPTH_RE = re.compile(r"\bdepth\s+(\d+)\b")
 NODES_RE = re.compile(r"\bnodes\s+(\d+)\b")
 NPS_RE = re.compile(r"\bnps\s+(\d+)\b")
+TIME_RE = re.compile(r"\btime\s+(\d+)\b")
 
 
 @dataclass
@@ -115,70 +116,95 @@ class Pikafish:
                 line = self._readline()
                 if line.startswith("bestmove"):
                     parts = line.split()
-                    bestmove = parts[1] if len(parts) > 1 else None
+                    bestmove = normalize_bestmove(parts[1] if len(parts) > 1 else None)
                     break
                 if line.startswith("info"):
                     parsed = parse_info(line, side_to_move(moves))
                     if parsed:
                         infos[parsed["multipv"]] = parsed
 
-        lines = []
-        for idx in sorted(infos):
-            info = infos[idx]
-            pv = info.get("pv", [])
-            lines.append({
-                **info,
-                "bestmove": pv[0] if pv else "",
-                "pv_cn": pv_to_chinese(moves, pv) if pv else [],
-            })
-
         return {
             "bestmove": bestmove,
             "bestmove_cn": pv_to_chinese(moves, [bestmove])[0] if bestmove else "",
-            "lines": lines,
+            "lines": build_lines(moves, infos, bestmove),
         }
 
 
 def parse_info(line: str, score_side: str = "red") -> dict[str, Any] | None:
     multipv_match = INFO_RE.search(line)
     pv_match = PV_RE.search(line)
-    if not pv_match:
+    score_match = SCORE_RE.search(line)
+    wdl_match = WDL_RE.search(line)
+    if not pv_match and not score_match and not wdl_match:
         return None
 
     multipv = int(multipv_match.group(1)) if multipv_match else 1
-    score_match = SCORE_RE.search(line)
-    wdl_match = WDL_RE.search(line)
     depth_match = DEPTH_RE.search(line)
     nodes_match = NODES_RE.search(line)
     nps_match = NPS_RE.search(line)
+    time_match = TIME_RE.search(line)
 
     score = None
     if score_match:
         kind = score_match.group(1)
         raw_value = int(score_match.group(2))
+        engine_bound = score_match.group(3)
         red_value = score_to_red_pov(kind, raw_value, score_side)
+        bound = bound_to_red_pov(engine_bound, score_side)
         score = {
             "type": kind,
             "value": red_value,
-            "display": format_score(kind, red_value),
+            "display": format_score(kind, red_value, bound),
+            "bound": bound,
             "engineValue": raw_value,
             "engineSide": score_side,
+            "engineBound": engine_bound,
         }
 
     wdl = None
+    engine_wdl = None
     if wdl_match:
-        raw_wdl = [int(wdl_match.group(1)), int(wdl_match.group(2)), int(wdl_match.group(3))]
-        wdl = raw_wdl if score_side == "red" else [raw_wdl[2], raw_wdl[1], raw_wdl[0]]
+        engine_wdl = [int(wdl_match.group(1)), int(wdl_match.group(2)), int(wdl_match.group(3))]
+        wdl = engine_wdl if score_side == "red" else [engine_wdl[2], engine_wdl[1], engine_wdl[0]]
+
+    pv_text = pv_match.group(1) if pv_match and pv_match.group(1) else ""
 
     return {
         "multipv": multipv,
         "depth": int(depth_match.group(1)) if depth_match else None,
         "nodes": int(nodes_match.group(1)) if nodes_match else None,
         "nps": int(nps_match.group(1)) if nps_match else None,
+        "timeMs": int(time_match.group(1)) if time_match else None,
         "score": score,
         "wdl": wdl,
-        "pv": pv_match.group(1).split(),
+        "engineWdl": engine_wdl,
+        "wdlSide": score_side if engine_wdl else None,
+        "pv": [move for move in pv_text.split() if normalize_bestmove(move)],
     }
+
+
+def normalize_bestmove(move: str | None) -> str:
+    if move in {None, "", "(none)", "0000"}:
+        return ""
+    return str(move)
+
+
+def build_lines(moves: list[str], infos: dict[int, dict[str, Any]], bestmove: str | None = "") -> list[dict[str, Any]]:
+    bestmove = normalize_bestmove(bestmove)
+    lines = []
+    for idx in sorted(infos):
+        info = infos[idx]
+        pv = [normalize_bestmove(move) for move in info.get("pv", [])]
+        pv = [move for move in pv if move]
+        if idx == 1 and not pv and bestmove:
+            pv = [bestmove]
+        lines.append({
+            **info,
+            "pv": pv,
+            "bestmove": pv[0] if pv else "",
+            "pv_cn": pv_to_chinese(moves, pv) if pv else [],
+        })
+    return lines
 
 
 def score_to_red_pov(kind: str, value: int, score_side: str) -> int:
@@ -187,13 +213,37 @@ def score_to_red_pov(kind: str, value: int, score_side: str) -> int:
     return value if score_side == "red" else -value
 
 
-def format_score(kind: str, value: int) -> str:
+def bound_to_red_pov(bound: str | None, score_side: str) -> str | None:
+    if bound is None:
+        return None
+    if score_side == "red":
+        return bound
+    if score_side == "black" and bound == "lowerbound":
+        return "upperbound"
+    if score_side == "black" and bound == "upperbound":
+        return "lowerbound"
+    raise ValueError(f"unsupported score side: {score_side}")
+
+
+def format_score(kind: str, value: int, bound: str | None = None) -> str:
     if kind == "mate":
-        return f"红方 M{value}" if value > 0 else f"黑方 M{abs(value)}"
+        if value >= 0:
+            return f"红方 M{value}"
+        return f"黑方 M{abs(value)}"
     pawns = value / 100
     if pawns >= 0:
-        return f"红方 +{pawns:.2f}"
-    return f"黑方 +{abs(pawns):.2f}"
+        operator = bound_operator(bound, "red")
+        return f"红方 {operator}{pawns:.2f}"
+    operator = bound_operator(bound, "black")
+    return f"黑方 {operator}{abs(pawns):.2f}"
+
+
+def bound_operator(bound: str | None, advantage_side: str) -> str:
+    if bound is None:
+        return "+"
+    if advantage_side == "red":
+        return ">=" if bound == "lowerbound" else "<="
+    return "<=" if bound == "lowerbound" else ">="
 
 
 _ENGINE: Pikafish | None = None
@@ -228,7 +278,7 @@ def fake_analysis(moves: list[str], multipv: int = 5) -> dict[str, Any]:
             "nodes": 1000 * idx,
             "nps": 50000,
             "score": fake_score(24 - idx, side),
-            "wdl": fake_wdl([64 - idx, 923 + idx, 13], side),
+            **fake_wdl([64 - idx, 923 + idx, 13], side),
             "pv": pv,
             "bestmove": move,
             "pv_cn": pv_to_chinese(moves, pv),
@@ -246,13 +296,19 @@ def fake_score(raw_value: int, score_side: str) -> dict[str, Any]:
         "type": "cp",
         "value": red_value,
         "display": format_score("cp", red_value),
+        "bound": None,
         "engineValue": raw_value,
         "engineSide": score_side,
+        "engineBound": None,
     }
 
 
-def fake_wdl(raw_wdl: list[int], score_side: str) -> list[int]:
-    return raw_wdl if score_side == "red" else [raw_wdl[2], raw_wdl[1], raw_wdl[0]]
+def fake_wdl(raw_wdl: list[int], score_side: str) -> dict[str, Any]:
+    return {
+        "wdl": raw_wdl if score_side == "red" else [raw_wdl[2], raw_wdl[1], raw_wdl[0]],
+        "engineWdl": raw_wdl,
+        "wdlSide": score_side,
+    }
 
 
 def build_fake_pv(history: list[str], first_move: str, length: int = 3) -> list[str]:

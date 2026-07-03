@@ -9,7 +9,7 @@ from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from web.backend.engine import SearchLimit, parse_info
+from web.backend.engine import SearchLimit, build_lines, normalize_bestmove, parse_info
 from web.backend.server import XiangqiHandler
 from web.backend.xiangqi import Piece, board_after, is_in_check, legal_moves, move_rows, moves_to_chinese, side_to_move, validate_legal_sequence
 
@@ -65,10 +65,14 @@ class EngineParsingTest(unittest.TestCase):
         assert parsed is not None
         self.assertEqual(parsed["multipv"], 2)
         self.assertEqual(parsed["score"]["display"], "红方 +0.21")
+        self.assertIsNone(parsed["score"]["bound"])
         self.assertEqual(parsed["score"]["value"], 21)
         self.assertEqual(parsed["score"]["engineValue"], 21)
         self.assertEqual(parsed["score"]["engineSide"], "red")
+        self.assertIsNone(parsed["score"]["engineBound"])
         self.assertEqual(parsed["wdl"], [59, 927, 14])
+        self.assertEqual(parsed["engineWdl"], [59, 927, 14])
+        self.assertEqual(parsed["wdlSide"], "red")
         self.assertEqual(parsed["pv"], ["g3g4", "h7g7", "b2e2"])
 
     def test_parse_info_line_normalizes_black_score_to_red_pov(self) -> None:
@@ -81,6 +85,8 @@ class EngineParsingTest(unittest.TestCase):
         self.assertEqual(parsed["score"]["engineValue"], 24)
         self.assertEqual(parsed["score"]["engineSide"], "black")
         self.assertEqual(parsed["wdl"], [13, 923, 64])
+        self.assertEqual(parsed["engineWdl"], [64, 923, 13])
+        self.assertEqual(parsed["wdlSide"], "black")
 
     def test_parse_info_line_normalizes_black_mate_to_red_pov(self) -> None:
         black_mates = parse_info("info depth 8 score mate 3 pv h9g7", "black")
@@ -91,6 +97,57 @@ class EngineParsingTest(unittest.TestCase):
         assert red_mates is not None
         self.assertEqual(black_mates["score"]["display"], "黑方 M3")
         self.assertEqual(red_mates["score"]["display"], "红方 M2")
+
+    def test_parse_info_line_preserves_score_bounds_in_red_pov(self) -> None:
+        red_lower = parse_info("info depth 8 score cp 80 lowerbound wdl 300 650 50 pv g3g4", "red")
+        black_lower = parse_info("info depth 8 score cp 80 lowerbound wdl 300 650 50 pv h9g7", "black")
+        self.assertIsNotNone(red_lower)
+        self.assertIsNotNone(black_lower)
+        assert red_lower is not None
+        assert black_lower is not None
+        self.assertEqual(red_lower["score"]["bound"], "lowerbound")
+        self.assertEqual(red_lower["score"]["display"], "红方 >=0.80")
+        self.assertEqual(black_lower["score"]["value"], -80)
+        self.assertEqual(black_lower["score"]["bound"], "upperbound")
+        self.assertEqual(black_lower["score"]["engineBound"], "lowerbound")
+        self.assertEqual(black_lower["score"]["display"], "黑方 >=0.80")
+
+    def test_parse_info_line_accepts_empty_pv(self) -> None:
+        parsed = parse_info("info depth 1 score cp 0 wdl 29 942 29 nodes 0 nps 0 time 1 pv", "red")
+        self.assertIsNotNone(parsed)
+        assert parsed is not None
+        self.assertEqual(parsed["pv"], [])
+        self.assertEqual(parsed["score"]["display"], "红方 +0.00")
+        self.assertEqual(parsed["timeMs"], 1)
+
+    def test_parse_info_ignores_info_lines_without_score_wdl_or_pv(self) -> None:
+        self.assertIsNone(parse_info("info string NNUE evaluation ready", "red"))
+
+    def test_build_lines_uses_bestmove_when_first_pv_is_empty(self) -> None:
+        infos = {
+            1: {
+                "multipv": 1,
+                "depth": 1,
+                "nodes": 0,
+                "nps": 0,
+                "timeMs": 1,
+                "score": {"type": "cp", "value": 0, "display": "红方 +0.00"},
+                "wdl": [29, 942, 29],
+                "engineWdl": [29, 942, 29],
+                "wdlSide": "red",
+                "pv": [],
+            }
+        }
+        lines = build_lines([], infos, "g3g4")
+        self.assertEqual(lines[0]["bestmove"], "g3g4")
+        self.assertEqual(lines[0]["pv"], ["g3g4"])
+        self.assertEqual(lines[0]["pv_cn"], ["兵三进一"])
+
+    def test_normalize_bestmove_handles_empty_engine_moves(self) -> None:
+        self.assertEqual(normalize_bestmove(None), "")
+        self.assertEqual(normalize_bestmove("(none)"), "")
+        self.assertEqual(normalize_bestmove("0000"), "")
+        self.assertEqual(normalize_bestmove("g3g4"), "g3g4")
 
     def test_search_limit_clamps_values(self) -> None:
         self.assertEqual(SearchLimit.from_payload({"mode": "depth", "value": 99}).go_args(), ["depth", "30"])
@@ -198,6 +255,10 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(data["bestmove"][1].isdigit())
         self.assertIn(data["bestmove"][:2], {"a6", "b7", "b9", "c6", "c9", "d9", "e6", "e9", "f9", "g6", "g9", "h7", "h9", "i6", "a9", "i9"})
+        self.assertEqual(data["sideToMove"], "black")
+        self.assertEqual(data["lines"][0]["score"]["engineSide"], "black")
+        self.assertLess(data["lines"][0]["score"]["value"], 0)
+        self.assertGreater(data["lines"][0]["wdl"][2], data["lines"][0]["wdl"][0])
 
 
 class FrontendReferenceTest(unittest.TestCase):

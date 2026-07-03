@@ -23,6 +23,8 @@ const state = {
   clocks: { red: 0, black: 0 },
   lastClockTick: Date.now(),
   generation: 0,
+  auditLogs: [],
+  mismatchCount: 0,
 };
 
 const el = {
@@ -44,6 +46,8 @@ const el = {
   recommendations: document.getElementById("recommendations"),
   historyMoves: document.getElementById("historyMoves"),
   historyModeLabel: document.getElementById("historyModeLabel"),
+  auditLog: document.getElementById("auditLog"),
+  mismatchCount: document.getElementById("mismatchCount"),
   depthText: document.getElementById("depthText"),
   nodesText: document.getElementById("nodesText"),
   wdlRed: document.getElementById("wdlRed"),
@@ -168,6 +172,27 @@ function renderHistory(positionData) {
   )).join("");
 }
 
+function addAudit(message, mismatch = false) {
+  const stamp = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  if (mismatch) state.mismatchCount += 1;
+  state.auditLogs.unshift({ stamp, message, mismatch });
+  state.auditLogs = state.auditLogs.slice(0, 8);
+  renderAudit();
+}
+
+function resetAudit() {
+  state.auditLogs = [];
+  state.mismatchCount = 0;
+  renderAudit();
+}
+
+function renderAudit() {
+  el.mismatchCount.textContent = `不匹配 ${state.mismatchCount}`;
+  el.auditLog.innerHTML = state.auditLogs.map((item) => (
+    `<div class="audit-item ${item.mismatch ? "mismatch" : ""}"><span>${item.message}</span><span>${item.stamp}</span></div>`
+  )).join("");
+}
+
 function scoreText(line) {
   return line.score?.display || "-";
 }
@@ -179,6 +204,9 @@ function renderAnalysis() {
     el.recommendations.innerHTML = "";
     el.depthText.textContent = "未分析";
     el.nodesText.textContent = "0 nodes";
+    el.wdlRed.textContent = "红胜 -";
+    el.wdlDraw.textContent = "和棋 -";
+    el.wdlBlack.textContent = "黑胜 -";
     return;
   }
 
@@ -191,6 +219,10 @@ function renderAnalysis() {
     el.wdlRed.textContent = `红胜 ${Math.round(best.wdl[0] / 10)}%`;
     el.wdlDraw.textContent = `和棋 ${Math.round(best.wdl[1] / 10)}%`;
     el.wdlBlack.textContent = `黑胜 ${Math.round(best.wdl[2] / 10)}%`;
+  } else {
+    el.wdlRed.textContent = "红胜 -";
+    el.wdlDraw.textContent = "和棋 -";
+    el.wdlBlack.textContent = "黑胜 -";
   }
 
   el.recommendations.innerHTML = analysis.lines.map((line, idx) => {
@@ -292,7 +324,12 @@ async function refreshAnalysis() {
   el.thinking.textContent = "思考中";
   el.engineStatus.textContent = "Pikafish thinking";
   const data = await api("/api/analyze", { moves: movesSnapshot, positionId: positionIdSnapshot, limit: currentLimit(sideSnapshot), multipv: 5 });
-  if (key !== movesKey() || generationSnapshot !== state.generation || data.positionId !== state.positionId) {
+  if (key !== movesKey() || generationSnapshot !== state.generation) {
+    addAudit("丢弃过期分析", true);
+    return false;
+  }
+  if (data.positionId !== state.positionId) {
+    addAudit("分析 positionId 不匹配", true);
     return false;
   }
   state.analysis = data;
@@ -310,15 +347,23 @@ async function playAiMove() {
     const refreshed = await refreshAnalysis();
     if (!refreshed) return;
   }
-  if (generationSnapshot !== state.generation) return;
+  if (generationSnapshot !== state.generation) {
+    addAudit("代走任务过期", true);
+    return;
+  }
   if (state.analysis?.positionId === state.positionId && state.analysis?.bestmove && state.legalMoves.includes(state.analysis.bestmove)) {
+    addAudit(`代走 ${state.analysis.bestmove}`);
     await movePiece(state.analysis.bestmove);
   } else if (state.analysis?.bestmove) {
+    addAudit("bestmove 审核失败，重新分析", true);
     state.analysis = null;
     state.analysisKey = "";
     await refreshAnalysis();
     if (state.analysis?.positionId === state.positionId && state.analysis?.bestmove && state.legalMoves.includes(state.analysis.bestmove)) {
+      addAudit(`代走 ${state.analysis.bestmove}`);
       await movePiece(state.analysis.bestmove);
+    } else {
+      addAudit("重新分析后仍未通过", true);
     }
   }
 }
@@ -359,6 +404,9 @@ function updateAiSearch(side) {
 function showError(error) {
   el.thinking.textContent = "错误";
   el.engineStatus.textContent = error.message;
+  if (/positionId|illegal|bestmove|不匹配/i.test(error.message)) {
+    addAudit(error.message, true);
+  }
   console.error(error);
 }
 
@@ -373,6 +421,8 @@ function bindControls() {
     state.analysisKey = "";
     state.clocks = { red: 0, black: 0 };
     state.lastClockTick = Date.now();
+    resetAudit();
+    addAudit("新局");
     syncPosition().then(() => refreshAnalysis()).then(() => scheduleAuto()).catch(showError);
   });
   document.getElementById("undoMove").addEventListener("click", () => {
@@ -444,6 +494,7 @@ bindControls();
 updateAiSearch("red");
 updateAiSearch("black");
 setInterval(tickClock, 500);
+renderAudit();
 syncPosition().then(() => refreshAnalysis()).then(() => scheduleAuto()).catch(showError);
 
 if ("serviceWorker" in navigator) {

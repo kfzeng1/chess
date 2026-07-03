@@ -137,6 +137,11 @@
               bestmove 是引擎建议的当前一步；pv 是按该步继续推演的主变。中文模式展示用户记谱，UCI 模式展示引擎坐标。score 正数为红方优势，WDL 依次为红胜、和棋、黑胜。
             </section>
 
+            <section class="audit">
+              <div class="engine-row"><span>代走审计</span><span id="mismatchCount">不匹配 0</span></div>
+              <div class="audit-list" id="auditLog"></div>
+            </section>
+
             <section class="history">
               <div class="history-head"><div class="engine-row"><span>走法记录</span><span id="historyModeLabel">中文</span></div></div>
               <div class="moves" id="historyMoves"></div>
