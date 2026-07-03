@@ -41,7 +41,7 @@ test("mismatch alert disables auto mode and restores the checked position", asyn
   await expect(page.locator("#mismatchCount")).toContainText("不匹配 1");
 });
 
-test("undo restores cached analysis for the returned position", async ({ page }) => {
+test("undo reruns analysis once after the debounce window", async ({ page }) => {
   let analyzeCalls = 0;
   await page.route("**/api/analyze", async (route) => {
     analyzeCalls += 1;
@@ -54,7 +54,6 @@ test("undo restores cached analysis for the returned position", async ({ page })
   await expect(page.locator("#autoMode")).toHaveText("自动代走：关");
 
   await expect.poll(() => analyzeCalls).toBe(1);
-  const initialPv = await page.locator("#pvLine").textContent();
   await expect(page.locator("#depthText")).toContainText("depth");
 
   await page.locator('.piece[data-square="h2"]').click();
@@ -64,9 +63,9 @@ test("undo restores cached analysis for the returned position", async ({ page })
 
   await page.getByTitle("撤销红方或黑方的一步").click();
   await expect(page.locator("#moveCount")).toHaveText("0 步");
-  await page.waitForTimeout(700);
-
+  await page.waitForTimeout(250);
   expect(analyzeCalls).toBe(2);
-  await expect(page.locator("#pvLine")).toHaveText(initialPv);
+
+  await expect.poll(() => analyzeCalls).toBe(3);
   await expect(page.locator("#depthText")).toContainText("depth");
 });

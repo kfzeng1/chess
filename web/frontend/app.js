@@ -26,7 +26,11 @@ const state = {
   auditLogs: [],
   mismatchCount: 0,
   mismatchHandling: false,
-  analysisCache: new Map(),
+  analysisInFlight: false,
+  analysisInFlightCount: 0,
+  pendingProtectedActions: new Map(),
+  flushingProtectedActions: false,
+  undoTimer: null,
 };
 
 const el = {
@@ -195,35 +199,6 @@ function renderAudit() {
   )).join("");
 }
 
-function searchKey(side = state.sideToMove) {
-  const limit = currentLimit(side);
-  return `${limit.mode}:${limit.value}`;
-}
-
-function analysisCacheKey(positionId = state.positionId, side = state.sideToMove) {
-  return `${positionId}|${side}|${searchKey(side)}|multipv:5`;
-}
-
-function rememberAnalysis(data, key = analysisCacheKey(data.positionId, data.sideToMove)) {
-  if (!data?.positionId || !data?.sideToMove) return;
-  state.analysisCache.set(key, data);
-  if (state.analysisCache.size > 80) {
-    const oldest = state.analysisCache.keys().next().value;
-    state.analysisCache.delete(oldest);
-  }
-}
-
-function restoreCachedAnalysis() {
-  const cached = state.analysisCache.get(analysisCacheKey());
-  if (!cached) return false;
-  state.analysis = cached;
-  state.analysisKey = movesKey();
-  renderAnalysis();
-  el.thinking.textContent = "待命";
-  el.engineStatus.textContent = "Pikafish ready";
-  return true;
-}
-
 function setAutoMode(enabled) {
   state.autoMode = enabled;
   el.autoMode.textContent = state.autoMode ? "自动代走：开" : "自动代走：关";
@@ -231,6 +206,51 @@ function setAutoMode(enabled) {
   el.autoMode.setAttribute("aria-pressed", state.autoMode ? "true" : "false");
   if (!state.autoMode) clearTimeout(state.autoTimer);
   else scheduleAuto();
+}
+
+function resetAnalysis() {
+  state.analysis = null;
+  state.analysisKey = "";
+  renderAnalysis();
+}
+
+async function runAfterAnalysis(key, action) {
+  state.pendingProtectedActions.set(key, action);
+  if (state.analysisInFlight || state.flushingProtectedActions) return;
+  state.flushingProtectedActions = true;
+  try {
+    while (!state.analysisInFlight && state.pendingProtectedActions.size > 0) {
+      const [[nextKey, nextAction]] = state.pendingProtectedActions;
+      state.pendingProtectedActions.delete(nextKey);
+      await nextAction();
+    }
+  } finally {
+    state.flushingProtectedActions = false;
+  }
+}
+
+function flushProtectedActions() {
+  if (state.analysisInFlight || state.flushingProtectedActions || state.pendingProtectedActions.size === 0) return;
+  state.flushingProtectedActions = true;
+  (async () => {
+    try {
+      while (!state.analysisInFlight && state.pendingProtectedActions.size > 0) {
+        const [[nextKey, nextAction]] = state.pendingProtectedActions;
+        state.pendingProtectedActions.delete(nextKey);
+        await nextAction();
+      }
+    } finally {
+      state.flushingProtectedActions = false;
+    }
+  })().catch(showError);
+}
+
+function scheduleUndoAnalysis() {
+  clearTimeout(state.undoTimer);
+  state.undoTimer = setTimeout(() => {
+    state.undoTimer = null;
+    refreshAnalysis().then(() => scheduleAuto()).catch(showError);
+  }, 500);
 }
 
 async function restoreToMoves(moves) {
@@ -242,7 +262,7 @@ async function restoreToMoves(moves) {
   state.analysis = null;
   state.analysisKey = "";
   await syncPosition();
-  if (!restoreCachedAnalysis()) await refreshAnalysis();
+  await refreshAnalysis();
 }
 
 async function handleMismatch(message, restoreMoves = state.moves) {
@@ -251,6 +271,8 @@ async function handleMismatch(message, restoreMoves = state.moves) {
   state.mismatchHandling = true;
   const targetMoves = [...restoreMoves];
   try {
+    clearTimeout(state.undoTimer);
+    state.pendingProtectedActions.clear();
     setAutoMode(false);
     await restoreToMoves(targetMoves);
     window.alert(`检测到代走不匹配：${message}\n\n已关闭自动代走，并回到触发检查时的局面。`);
@@ -323,6 +345,7 @@ async function syncPosition() {
 
 async function movePiece(move) {
   clearTimeout(state.autoTimer);
+  clearTimeout(state.undoTimer);
   const previousMoves = [...state.moves];
   const previousLastMove = state.lastMove;
   const previousGeneration = state.generation;
@@ -390,28 +413,39 @@ async function refreshAnalysis() {
   const sideSnapshot = state.sideToMove;
   const generationSnapshot = state.generation;
   const positionIdSnapshot = state.positionId;
+  state.analysisInFlightCount += 1;
+  state.analysisInFlight = true;
   el.thinking.textContent = "思考中";
   el.engineStatus.textContent = "Pikafish thinking";
-  const data = await api("/api/analyze", { moves: movesSnapshot, positionId: positionIdSnapshot, limit: currentLimit(sideSnapshot), multipv: 5 });
-  if (key !== movesKey() || generationSnapshot !== state.generation) {
-    addAudit("丢弃过期分析");
-    return false;
+  try {
+    const data = await api("/api/analyze", { moves: movesSnapshot, positionId: positionIdSnapshot, limit: currentLimit(sideSnapshot), multipv: 5 });
+    if (key !== movesKey() || generationSnapshot !== state.generation) {
+      addAudit("丢弃过期分析");
+      return false;
+    }
+    if (data.positionId !== state.positionId) {
+      await handleMismatch("分析 positionId 不匹配", movesSnapshot);
+      return false;
+    }
+    state.analysis = data;
+    state.analysisKey = key;
+    renderAnalysis();
+    el.thinking.textContent = "待命";
+    el.engineStatus.textContent = "Pikafish ready";
+    return true;
+  } finally {
+    state.analysisInFlightCount = Math.max(0, state.analysisInFlightCount - 1);
+    state.analysisInFlight = state.analysisInFlightCount > 0;
+    if (!state.analysisInFlight) flushProtectedActions();
   }
-  if (data.positionId !== state.positionId) {
-    await handleMismatch("分析 positionId 不匹配", movesSnapshot);
-    return false;
-  }
-  state.analysis = data;
-  state.analysisKey = key;
-  rememberAnalysis(data);
-  renderAnalysis();
-  el.thinking.textContent = "待命";
-  el.engineStatus.textContent = "Pikafish ready";
-  return true;
 }
 
 async function playAiMove() {
   if (state.gameOver) return;
+  if (state.analysisInFlight) {
+    await runAfterAnalysis("manual-ai", () => playAiMove());
+    return;
+  }
   const generationSnapshot = state.generation;
   const movesSnapshot = [...state.moves];
   if (!state.analysis || state.analysisKey !== movesKey()) {
@@ -434,6 +468,7 @@ function scheduleAuto() {
   clearTimeout(state.autoTimer);
   if (state.gameOver) return;
   if (!state.autoMode || state.players[state.sideToMove] !== "ai") return;
+  if (state.analysisInFlight || !state.analysis || state.analysisKey !== movesKey()) return;
   const delay = Number(el.delayRange.value) * 1000;
   const generationSnapshot = state.generation;
   const sideSnapshot = state.sideToMove;
@@ -475,13 +510,13 @@ function showError(error) {
 function bindControls() {
   document.getElementById("newGame").addEventListener("click", () => {
     clearTimeout(state.autoTimer);
+    clearTimeout(state.undoTimer);
+    state.pendingProtectedActions.clear();
     state.generation += 1;
     state.moves = [];
     state.selected = null;
     state.lastMove = null;
-    state.analysis = null;
-    state.analysisKey = "";
-    state.analysisCache.clear();
+    resetAnalysis();
     state.clocks = { red: 0, black: 0 };
     state.lastClockTick = Date.now();
     resetAudit();
@@ -490,66 +525,61 @@ function bindControls() {
   });
   document.getElementById("undoMove").addEventListener("click", () => {
     clearTimeout(state.autoTimer);
+    if (state.moves.length === 0) return;
     state.generation += 1;
     state.moves.pop();
     state.lastMove = state.moves.at(-1) || null;
-    state.analysis = null;
-    state.analysisKey = "";
-    syncPosition().then(() => {
-      if (restoreCachedAnalysis()) return true;
-      return refreshAnalysis();
-    }).then(() => scheduleAuto()).catch(showError);
+    resetAnalysis();
+    syncPosition().then(() => scheduleUndoAnalysis()).catch(showError);
   });
   document.getElementById("flipBoard").addEventListener("click", () => {
     state.flipped = !state.flipped;
     renderBoard();
   });
   el.autoMode.addEventListener("click", () => {
-    setAutoMode(!state.autoMode);
+    runAfterAnalysis("auto-mode", async () => setAutoMode(!state.autoMode)).catch(showError);
   });
-  el.manualAi.addEventListener("click", () => playAiMove().catch(showError));
+  el.manualAi.addEventListener("click", () => runAfterAnalysis("manual-ai", () => playAiMove()).catch(showError));
   el.delayRange.addEventListener("input", () => {
-    el.delayLabel.textContent = `${Number(el.delayRange.value).toFixed(1)}s 最小间隔`;
-    scheduleAuto();
+    runAfterAnalysis("delay", async () => {
+      el.delayLabel.textContent = `${Number(el.delayRange.value).toFixed(1)}s 最小间隔`;
+      scheduleAuto();
+    }).catch(showError);
   });
   document.querySelectorAll(".segmented").forEach((segmented) => {
     segmented.addEventListener("click", (event) => {
       const button = event.target.closest("button");
       if (!button) return;
-      const side = segmented.dataset.side;
-      state.players[side] = button.dataset.player;
-      segmented.querySelectorAll("button").forEach((item) => item.classList.remove("active-red", "active-black"));
-      button.classList.add(side === "red" ? "active-red" : "active-black");
-      renderStatus();
-      scheduleAuto();
+      runAfterAnalysis(`player-${segmented.dataset.side}`, async () => {
+        const side = segmented.dataset.side;
+        state.players[side] = button.dataset.player;
+        segmented.querySelectorAll("button").forEach((item) => item.classList.remove("active-red", "active-black"));
+        button.classList.add(side === "red" ? "active-red" : "active-black");
+        renderStatus();
+        scheduleAuto();
+      }).catch(showError);
     });
   });
   document.querySelectorAll("[data-ai-mode-tabs]").forEach((tabs) => {
     tabs.addEventListener("click", (event) => {
       const button = event.target.closest("button");
       if (!button) return;
-      const side = tabs.dataset.aiModeTabs;
-      state.aiSearch[side].mode = button.dataset.aiMode;
-      updateAiSearch(side);
-      if (side === state.sideToMove) {
-        state.analysis = null;
-        state.analysisKey = "";
-        restoreCachedAnalysis();
-      }
+      runAfterAnalysis(`ai-mode-${tabs.dataset.aiModeTabs}`, async () => {
+        const side = tabs.dataset.aiModeTabs;
+        state.aiSearch[side].mode = button.dataset.aiMode;
+        updateAiSearch(side);
+      }).catch(showError);
     });
   });
   document.querySelectorAll("[data-ai-range]").forEach((range) => {
     range.addEventListener("input", () => {
       const side = range.dataset.aiRange;
-      const config = state.aiSearch[side];
-      if (config.mode === "movetime") config.movetime = Number(range.value);
-      else config.depth = Number(range.value);
-      updateAiSearch(side);
-      if (side === state.sideToMove) {
-        state.analysis = null;
-        state.analysisKey = "";
-        restoreCachedAnalysis();
-      }
+      runAfterAnalysis(`ai-range-${side}`, async () => {
+        const config = state.aiSearch[side];
+        if (config.mode === "movetime") config.movetime = Number(range.value);
+        else config.depth = Number(range.value);
+        updateAiSearch(side);
+      }).catch(showError);
     });
   });
   document.querySelectorAll("[data-notation-mode]").forEach((button) => {
