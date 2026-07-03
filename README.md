@@ -57,9 +57,24 @@ The APK currently includes:
 - Native Java UI with board, pieces, red/black AI toggles, automatic delegated
   moves, manual `本步 AI`, WDL/score/PV display, and Chinese/UCI notation
   switching.
+- Mobile layout mirrors the web mobile preview: top configuration/analysis
+  actions, large board-first play area, bottom quick actions, status cards, and
+  side drawers for configuration and analysis.
 
 The debug APK is unsigned for store distribution but installable for personal
 testing after enabling Android debug/unknown-source installation.
+
+Recent emulator screenshots were captured for layout review:
+
+```text
+/tmp/xiangqi-apk-shots/main.png
+/tmp/xiangqi-apk-shots/config.png
+/tmp/xiangqi-apk-shots/analysis.png
+```
+
+The local emulator used for screenshots is `x86_64`, while the bundled
+Pikafish binary is `arm64-v8a`; layout screenshots are valid, but real engine
+analysis should be tested on an arm64 Android phone.
 
 ## Web App
 
