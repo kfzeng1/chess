@@ -65,8 +65,32 @@ class EngineParsingTest(unittest.TestCase):
         assert parsed is not None
         self.assertEqual(parsed["multipv"], 2)
         self.assertEqual(parsed["score"]["display"], "红方 +0.21")
+        self.assertEqual(parsed["score"]["value"], 21)
+        self.assertEqual(parsed["score"]["engineValue"], 21)
+        self.assertEqual(parsed["score"]["engineSide"], "red")
         self.assertEqual(parsed["wdl"], [59, 927, 14])
         self.assertEqual(parsed["pv"], ["g3g4", "h7g7", "b2e2"])
+
+    def test_parse_info_line_normalizes_black_score_to_red_pov(self) -> None:
+        line = "info depth 12 multipv 1 score cp 24 wdl 64 923 13 nodes 2000 nps 50000 pv h9g7 h2e2"
+        parsed = parse_info(line, "black")
+        self.assertIsNotNone(parsed)
+        assert parsed is not None
+        self.assertEqual(parsed["score"]["value"], -24)
+        self.assertEqual(parsed["score"]["display"], "黑方 +0.24")
+        self.assertEqual(parsed["score"]["engineValue"], 24)
+        self.assertEqual(parsed["score"]["engineSide"], "black")
+        self.assertEqual(parsed["wdl"], [13, 923, 64])
+
+    def test_parse_info_line_normalizes_black_mate_to_red_pov(self) -> None:
+        black_mates = parse_info("info depth 8 score mate 3 pv h9g7", "black")
+        red_mates = parse_info("info depth 8 score mate -2 pv h9g7", "black")
+        self.assertIsNotNone(black_mates)
+        self.assertIsNotNone(red_mates)
+        assert black_mates is not None
+        assert red_mates is not None
+        self.assertEqual(black_mates["score"]["display"], "黑方 M3")
+        self.assertEqual(red_mates["score"]["display"], "红方 M2")
 
     def test_search_limit_clamps_values(self) -> None:
         self.assertEqual(SearchLimit.from_payload({"mode": "depth", "value": 99}).go_args(), ["depth", "30"])

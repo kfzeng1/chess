@@ -118,7 +118,7 @@ class Pikafish:
                     bestmove = parts[1] if len(parts) > 1 else None
                     break
                 if line.startswith("info"):
-                    parsed = parse_info(line)
+                    parsed = parse_info(line, side_to_move(moves))
                     if parsed:
                         infos[parsed["multipv"]] = parsed
 
@@ -139,7 +139,7 @@ class Pikafish:
         }
 
 
-def parse_info(line: str) -> dict[str, Any] | None:
+def parse_info(line: str, score_side: str = "red") -> dict[str, Any] | None:
     multipv_match = INFO_RE.search(line)
     pv_match = PV_RE.search(line)
     if not pv_match:
@@ -154,11 +154,21 @@ def parse_info(line: str) -> dict[str, Any] | None:
 
     score = None
     if score_match:
+        kind = score_match.group(1)
+        raw_value = int(score_match.group(2))
+        red_value = score_to_red_pov(kind, raw_value, score_side)
         score = {
-            "type": score_match.group(1),
-            "value": int(score_match.group(2)),
-            "display": format_score(score_match.group(1), int(score_match.group(2))),
+            "type": kind,
+            "value": red_value,
+            "display": format_score(kind, red_value),
+            "engineValue": raw_value,
+            "engineSide": score_side,
         }
+
+    wdl = None
+    if wdl_match:
+        raw_wdl = [int(wdl_match.group(1)), int(wdl_match.group(2)), int(wdl_match.group(3))]
+        wdl = raw_wdl if score_side == "red" else [raw_wdl[2], raw_wdl[1], raw_wdl[0]]
 
     return {
         "multipv": multipv,
@@ -166,9 +176,15 @@ def parse_info(line: str) -> dict[str, Any] | None:
         "nodes": int(nodes_match.group(1)) if nodes_match else None,
         "nps": int(nps_match.group(1)) if nps_match else None,
         "score": score,
-        "wdl": [int(wdl_match.group(1)), int(wdl_match.group(2)), int(wdl_match.group(3))] if wdl_match else None,
+        "wdl": wdl,
         "pv": pv_match.group(1).split(),
     }
+
+
+def score_to_red_pov(kind: str, value: int, score_side: str) -> int:
+    if score_side not in {"red", "black"}:
+        raise ValueError(f"unsupported score side: {score_side}")
+    return value if score_side == "red" else -value
 
 
 def format_score(kind: str, value: int) -> str:
@@ -211,8 +227,8 @@ def fake_analysis(moves: list[str], multipv: int = 5) -> dict[str, Any]:
             "depth": 12,
             "nodes": 1000 * idx,
             "nps": 50000,
-            "score": {"type": "cp", "value": 24 - idx, "display": f"红方 +0.{24 - idx:02d}"},
-            "wdl": [64 - idx, 923 + idx, 13],
+            "score": fake_score(24 - idx, side),
+            "wdl": fake_wdl([64 - idx, 923 + idx, 13], side),
             "pv": pv,
             "bestmove": move,
             "pv_cn": pv_to_chinese(moves, pv),
@@ -222,6 +238,21 @@ def fake_analysis(moves: list[str], multipv: int = 5) -> dict[str, Any]:
         "bestmove_cn": pv_to_chinese(moves, [candidates[0]])[0] if candidates else "",
         "lines": lines,
     }
+
+
+def fake_score(raw_value: int, score_side: str) -> dict[str, Any]:
+    red_value = score_to_red_pov("cp", raw_value, score_side)
+    return {
+        "type": "cp",
+        "value": red_value,
+        "display": format_score("cp", red_value),
+        "engineValue": raw_value,
+        "engineSide": score_side,
+    }
+
+
+def fake_wdl(raw_wdl: list[int], score_side: str) -> list[int]:
+    return raw_wdl if score_side == "red" else [raw_wdl[2], raw_wdl[1], raw_wdl[0]]
 
 
 def build_fake_pv(history: list[str], first_move: str, length: int = 3) -> list[str]:
