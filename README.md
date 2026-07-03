@@ -1,44 +1,31 @@
-# Chinese Chess AI
+# Chinese Chess AI Android
 
-This repository contains a runnable Xiangqi AI web app, an offline personal-use
-Android APK, board/piece assets, and local Pikafish engine builds.
+This branch contains the offline personal-use Android APK for the Xiangqi AI
+app, bundled board/piece assets, the Android Pikafish engine, and a Linux
+Pikafish smoke test for the shared Java engine parser.
 
 ## Structure
 
 ```text
-assets/
-  board.png              # latest board image
-  pieces/*.png           # latest red/black piece images
-  ui-preview.png         # latest desktop web app screenshot
 android/
   app/                   # native offline Android APK
+assets/
+  board.png              # source board asset
+  pieces/*.png           # source red/black piece assets
 docs/
-  ARCHITECTURE.md        # module and data-flow notes
+  ARCHITECTURE.md        # shared architecture notes
   MOBILE_MIGRATION.md    # Android APK and mobile notes
-  WEB_TO_ANDROID_PARITY.md # web UI/API parity checklist for APK work
-  WEB_APP.md             # web app API and run notes
+  WEB_TO_ANDROID_PARITY.md # web UI/API parity checklist for APK behavior
 engines/
-  pikafish-avxvnni       # Pikafish Linux x86-64 AVX-VNNI binary
+  pikafish-avxvnni       # Linux test binary for parser smoke tests
   pikafish.nnue          # matching NNUE network
-tests/
-  frontend_mismatch.spec.js
-  test_backend.py
-playwright.config.js      # starts the fake-engine server for frontend tests
-tools/asset-generation/
-  render_xiangqi_board.py
-  render_xiangqi_pieces.py
-web/
-  backend/               # Python stdlib API server and Pikafish adapter
-  frontend/              # HTML/CSS/JS web app
-Makefile                 # common run/test/screenshot commands
+tools/
+  android-engine-test/   # Java CLI smoke test using the Linux engine
+  asset-generation/      # board and piece render scripts
+Makefile                 # Android build and test commands
 ```
 
-## Offline Android APK
-
-The native APK lives under `android/`. It is intended for personal offline use:
-no browser, no network, and no Python backend are required on the phone.
-
-Build:
+## Build APK
 
 ```bash
 make apk-debug
@@ -50,167 +37,51 @@ Output:
 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The APK currently includes:
+The APK is offline: no browser, network, Python backend, or web server is
+required once installed.
 
-- `lib/arm64-v8a/libpikafish.so`: Pikafish dev-20260628-553282ed rebuilt with
-  Android NDK for arm64.
-- `assets/pikafish.nnue`: matching NNUE network.
-- Native Java UI with board, pieces, red/black AI toggles, automatic delegated
-  moves, manual `本步 AI`, WDL/score/PV display, and Chinese/UCI notation
-  switching.
-- Red/black AI strength controls match the web app: each side supports
-  `go movetime <ms>` and `go depth <plies>` with the exact UCI command shown in
-  the configuration drawer.
-- Web-parity behavior includes WDL percentages, live red/black clocks,
-  protected control actions while analysis is running, 0.5s undo analysis
-  debounce, mismatch alerts, audit entries, and recommendation cards with score
-  and WDL.
-- Mobile layout mirrors the web mobile preview: top configuration/analysis
-  actions, large board-first play area, bottom quick actions, status cards, and
-  side drawers for configuration and analysis.
+## Test
 
-The debug APK is unsigned for store distribution but installable for personal
-testing after enabling Android debug/unknown-source installation.
-
-Recent emulator screenshots were captured for layout review:
-
-```text
-/tmp/xiangqi-apk-shots/android-main-fixed.png
-/tmp/xiangqi-apk-shots/android-config-segmented.png
-/tmp/xiangqi-apk-shots/android-analysis.png
-```
-
-The local emulator used for screenshots is `x86_64`, while the bundled
-Pikafish binary is `arm64-v8a`; layout screenshots are valid, but real engine
-analysis should be tested on an arm64 Android phone. The shared Java engine
-parser can also be tested with the Linux Pikafish binary:
+Build the APK:
 
 ```bash
-make test-android-engine
-```
-
-## Web App
-
-The runnable web app lives under `web/`.
-
-```bash
-python3 -m web.backend.server
-```
-
-or:
-
-```bash
-make run
-```
-
-For testing from a phone on the same LAN:
-
-```bash
-make run-lan
-```
-
-Then open `http://<your-computer-ip>:8080/` on the phone.
-
-Open:
-
-```text
-http://127.0.0.1:8080/
-```
-
-Fast test mode without launching Pikafish:
-
-```bash
-XIANGQI_FAKE_ENGINE=1 python3 -m web.backend.server
-```
-
-or:
-
-```bash
-make run-fake
-```
-
-LAN fake-engine mode:
-
-```bash
-make run-fake-lan
-```
-
-Refresh the desktop screenshot:
-
-```bash
-npx playwright screenshot --viewport-size=1440,960 \
-  http://127.0.0.1:8080/ \
-  assets/ui-preview.png
-```
-
-Quick mobile viewport check:
-
-```bash
-make screenshot-mobile
-```
-
-This writes mobile screenshots for 390px portrait, 360px portrait, and landscape
-phone viewports to `/tmp/xiangqi-mobile-*.png`.
-
-Run tests:
-
-```bash
-make test
-npm run test:frontend
-make test-android-engine
 make apk-debug
 ```
 
-`npm run test:frontend` starts a fake-engine web server automatically through
-Playwright when port 8080 is not already running.
-
-Remove generated local files:
+Run the Android Java engine parser smoke test with the Linux Pikafish binary:
 
 ```bash
-make clean
+make test-android-engine
 ```
 
-More details: [docs/WEB_APP.md](docs/WEB_APP.md).
-Architecture notes: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-Mobile migration notes: [docs/MOBILE_MIGRATION.md](docs/MOBILE_MIGRATION.md).
-APK parity notes: [docs/WEB_TO_ANDROID_PARITY.md](docs/WEB_TO_ANDROID_PARITY.md).
+The local emulator is usually `x86_64`, while the packaged APK engine is
+`arm64-v8a/libpikafish.so`. Use the emulator for layout checks and an arm64
+phone for full APK engine runtime checks.
 
-## Regenerate Assets
+## APK Features
+
+- Native Java UI with board, pieces, side drawers, and mobile-first layout.
+- Local Pikafish dev-20260628-553282ed engine bundled for Android arm64.
+- Red/black AI toggles, manual `本步 AI`, and automatic delegated moves.
+- Red/black independent AI strength controls: `go movetime <ms>` and
+  `go depth <plies>`.
+- WDL percentage display, red/black clocks, MultiPV recommendations, Chinese/UCI
+  notation switching, audit entries, mismatch alerts, and rollback protection.
+
+More details:
+
+- [docs/MOBILE_MIGRATION.md](docs/MOBILE_MIGRATION.md)
+- [docs/WEB_TO_ANDROID_PARITY.md](docs/WEB_TO_ANDROID_PARITY.md)
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+## Assets
+
+Regenerate source assets:
 
 ```bash
 python3 tools/asset-generation/render_xiangqi_board.py
 python3 tools/asset-generation/render_xiangqi_pieces.py
 ```
 
-Board coordinates follow Pikafish/UCI notation:
-
-- Files: `a` through `i`, left to right
-- Ranks: `0` at the red side bottom, `9` at the black side top
-- Example: `c3c4` moves from file `c`, rank `3` to file `c`, rank `4`
-
-Piece filenames use side and role names, for example `red_king.png`,
-`black_cannon.png`, and `red_pawn.png`.
-
-## Pikafish
-
-- Engine: `Pikafish dev-20260628-553282ed`
-- Source commit: `553282edc90181f1f420a210d55eb67f9f14c9e9`
-- Desktop build arch: `x86-64-avxvnni`
-- Android build arch: `armv8` / `arm64-v8a`
-- NNUE SHA-256: `a2f41d4d0b9f59c5b5ecb3ca129fe24e3a722ea2f00ee252ae14d5dc08899f6a`
-
-Run:
-
-```bash
-./engines/pikafish-avxvnni
-```
-
-The engine uses UCI. Keep `pikafish.nnue` next to the binary unless you set the
-`EvalFile` UCI option to another path.
-
-Android engine rebuild command used locally:
-
-```bash
-PATH=/home/zkf/Android/Sdk/ndk/29.0.13599879/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH \
-  make -C /tmp/Pikafish/src -j2 build ARCH=armv8 COMP=ndk
-```
+Android runtime assets are copied into `android/app/src/main/res/drawable-nodpi/`
+and `android/app/src/main/assets/`.
