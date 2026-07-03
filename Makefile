@@ -1,4 +1,4 @@
-.PHONY: run run-fake test test-frontend screenshot clean
+.PHONY: run run-fake test test-frontend screenshot screenshot-mobile clean
 
 run:
 	python3 -m web.backend.server
@@ -15,5 +15,8 @@ test-frontend:
 screenshot:
 	npx playwright screenshot --viewport-size=1440,960 http://127.0.0.1:8080/ assets/ui-preview.png
 
+screenshot-mobile:
+	npx playwright screenshot --viewport-size=390,844 http://127.0.0.1:8080/ /tmp/xiangqi-mobile.png
+
 clean:
-	rm -rf tests/__pycache__ web/__pycache__ web/backend/__pycache__ .pytest_cache test-results playwright-report
+	rm -rf tests/__pycache__ web/__pycache__ web/backend/__pycache__ .pytest_cache test-results playwright-report logs

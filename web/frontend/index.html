@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>象棋 AI 对弈</title>
     <meta name="theme-color" content="#c7352d">
     <link rel="manifest" href="/manifest.webmanifest">
@@ -19,58 +19,63 @@
       </header>
 
       <main class="workspace">
-        <aside class="panel left">
+        <aside class="panel left controls-panel">
           <div class="panel-header"><div class="panel-title">对局控制</div></div>
           <div class="panel-body stack">
-            <div class="toolbar">
-              <div class="tool-item"><div class="tool-label">新局</div><button class="icon-btn" id="newGame" title="新局">↻</button></div>
-              <div class="tool-item"><div class="tool-label">悔棋</div><button class="icon-btn" id="undoMove" title="撤销红方或黑方的一步">↶</button></div>
-              <div class="tool-item"><div class="tool-label">翻转</div><button class="icon-btn" id="flipBoard" title="翻转棋盘">⇅</button></div>
+            <div class="control-primary">
+              <div class="toolbar">
+                <div class="tool-item"><div class="tool-label">新局</div><button class="icon-btn" id="newGame" title="新局">↻</button></div>
+                <div class="tool-item"><div class="tool-label">悔棋</div><button class="icon-btn" id="undoMove" title="撤销红方或黑方的一步">↶</button></div>
+                <div class="tool-item"><div class="tool-label">翻转</div><button class="icon-btn" id="flipBoard" title="翻转棋盘">⇅</button></div>
+              </div>
+
+              <button class="cmd-btn primary" id="autoMode" type="button" aria-pressed="true">自动代走：开</button>
+              <button class="cmd-btn teal" id="manualAi" type="button" title="使用当前局面分析完成后的 bestmove 代走；未完成会先等待分析">本步 AI</button>
             </div>
 
-            <button class="cmd-btn primary" id="autoMode" type="button" aria-pressed="true">自动代走：开</button>
+            <div class="control-grid">
+              <div class="field player-field">
+                <div class="field-row"><strong>红方</strong><span id="redLabel">Human</span></div>
+                <div class="segmented" data-side="red">
+                  <button class="active-red" type="button" data-player="human">人类</button>
+                  <button type="button" data-player="ai">AI</button>
+                </div>
+              </div>
 
-            <div class="delay-control">
-              <div class="field-row"><strong>代走间隔</strong><span id="delayLabel">2.0s 最小间隔</span></div>
-              <input id="delayRange" type="range" min="0" max="5" step="0.5" value="2" aria-label="AI 分析完成后的最小代走间隔" title="AI 分析完成后，至少等待这段时间再代走">
-            </div>
+              <div class="field player-field">
+                <div class="field-row"><strong>黑方</strong><span id="blackLabel">Pikafish</span></div>
+                <div class="segmented" data-side="black">
+                  <button type="button" data-player="human">人类</button>
+                  <button class="active-black" type="button" data-player="ai">AI</button>
+                </div>
+              </div>
 
-            <div class="field">
-              <div class="field-row"><strong>红方</strong><span id="redLabel">Human</span></div>
-              <div class="segmented" data-side="red">
-                <button class="active-red" type="button" data-player="human">人类</button>
-                <button type="button" data-player="ai">AI</button>
+              <div class="delay-control">
+                <div class="field-row"><strong>代走间隔</strong><span id="delayLabel">2.0s 最小间隔</span></div>
+                <input id="delayRange" type="range" min="0" max="5" step="0.5" value="2" aria-label="AI 分析完成后的最小代走间隔" title="AI 分析完成后，至少等待这段时间再代走">
               </div>
             </div>
 
-            <div class="field">
-              <div class="field-row"><strong>黑方</strong><span id="blackLabel">Pikafish</span></div>
-              <div class="segmented" data-side="black">
-                <button type="button" data-player="human">人类</button>
-                <button class="active-black" type="button" data-player="ai">AI</button>
+            <div class="ai-settings">
+              <div class="ai-card" data-ai-strength="red">
+                <div class="field-row"><strong>红方 AI 搜索</strong><span data-ai-label="red">每步 1.0s</span></div>
+                <div class="mode-tabs" data-ai-mode-tabs="red">
+                  <button class="active-red" type="button" data-ai-mode="movetime">时间</button>
+                  <button type="button" data-ai-mode="depth">深度</button>
+                </div>
+                <input class="search-slider red" data-ai-range="red" type="range" min="0.1" max="30" step="0.1" value="1">
+                <div class="uci-command" data-ai-command="red">go movetime 1000</div>
               </div>
-            </div>
 
-            <button class="cmd-btn teal" id="manualAi" type="button" title="使用当前局面分析完成后的 bestmove 代走；未完成会先等待分析">本步 AI</button>
-
-            <div class="ai-card" data-ai-strength="red">
-              <div class="field-row"><strong>红方 AI 搜索</strong><span data-ai-label="red">每步 1.0s</span></div>
-              <div class="mode-tabs" data-ai-mode-tabs="red">
-                <button class="active-red" type="button" data-ai-mode="movetime">时间</button>
-                <button type="button" data-ai-mode="depth">深度</button>
+              <div class="ai-card" data-ai-strength="black">
+                <div class="field-row"><strong>黑方 AI 搜索</strong><span data-ai-label="black">depth 16</span></div>
+                <div class="mode-tabs" data-ai-mode-tabs="black">
+                  <button type="button" data-ai-mode="movetime">时间</button>
+                  <button class="active-black" type="button" data-ai-mode="depth">深度</button>
+                </div>
+                <input class="search-slider black" data-ai-range="black" type="range" min="1" max="30" step="1" value="16">
+                <div class="uci-command" data-ai-command="black">go depth 16</div>
               </div>
-              <input class="search-slider red" data-ai-range="red" type="range" min="0.1" max="30" step="0.1" value="1">
-              <div class="uci-command" data-ai-command="red">go movetime 1000</div>
-            </div>
-
-            <div class="ai-card" data-ai-strength="black">
-              <div class="field-row"><strong>黑方 AI 搜索</strong><span data-ai-label="black">depth 16</span></div>
-              <div class="mode-tabs" data-ai-mode-tabs="black">
-                <button type="button" data-ai-mode="movetime">时间</button>
-                <button class="active-black" type="button" data-ai-mode="depth">深度</button>
-              </div>
-              <input class="search-slider black" data-ai-range="black" type="range" min="1" max="30" step="1" value="16">
-              <div class="uci-command" data-ai-command="black">go depth 16</div>
             </div>
 
             <div class="status-grid">
@@ -137,7 +142,7 @@
               bestmove 是引擎建议的当前一步；pv 是按该步继续推演的主变。中文模式展示用户记谱，UCI 模式展示引擎坐标。score 正数为红方优势，WDL 依次为红胜、和棋、黑胜。
             </section>
 
-            <section class="audit">
+            <section class="audit" id="auditSection">
               <div class="engine-row"><span>代走审计</span><span id="mismatchCount">不匹配 0</span></div>
               <div class="audit-list" id="auditLog"></div>
             </section>

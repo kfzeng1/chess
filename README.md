@@ -18,7 +18,9 @@ engines/
   pikafish-avxvnni       # Pikafish Linux x86-64 AVX-VNNI binary
   pikafish.nnue          # matching NNUE network
 tests/
+  frontend_mismatch.spec.js
   test_backend.py
+playwright.config.js      # starts the fake-engine server for frontend tests
 tools/asset-generation/
   render_xiangqi_board.py
   render_xiangqi_pieces.py
@@ -68,16 +70,26 @@ npx playwright screenshot --viewport-size=1440,960 \
   assets/ui-preview.png
 ```
 
+Quick mobile viewport check:
+
+```bash
+make screenshot-mobile
+```
+
 Run tests:
 
 ```bash
-python3 -m unittest discover -s tests -v
+make test
+npm run test:frontend
 ```
 
-or:
+`npm run test:frontend` starts a fake-engine web server automatically through
+Playwright when port 8080 is not already running.
+
+Remove generated local files:
 
 ```bash
-make test
+make clean
 ```
 
 More details: [docs/WEB_APP.md](docs/WEB_APP.md).
