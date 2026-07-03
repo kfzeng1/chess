@@ -1,6 +1,7 @@
 *.log
 *.tmp
 *.bak
+logs/
 core
 core.*
 .DS_Store

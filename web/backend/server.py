@@ -4,6 +4,7 @@ import json
 import mimetypes
 import os
 import hashlib
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,8 @@ from .xiangqi import START_BOARD, Piece, board_after, is_in_check, legal_moves, 
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIR = ROOT / "web" / "frontend"
 ASSETS_DIR = ROOT / "assets"
+LOG_DIR = ROOT / "logs"
+EVENT_LOG = LOG_DIR / "game-events.jsonl"
 
 
 def piece_payload(square: str, piece: Piece) -> dict[str, str]:
@@ -29,11 +32,14 @@ def piece_payload(square: str, piece: Piece) -> dict[str, str]:
 
 def json_response(handler: BaseHTTPRequestHandler, status: int, payload: Any) -> None:
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    handler.send_response(status)
-    handler.send_header("Content-Type", "application/json; charset=utf-8")
-    handler.send_header("Content-Length", str(len(body)))
-    handler.end_headers()
-    handler.wfile.write(body)
+    try:
+        handler.send_response(status)
+        handler.send_header("Content-Type", "application/json; charset=utf-8")
+        handler.send_header("Content-Length", str(len(body)))
+        handler.end_headers()
+        handler.wfile.write(body)
+    except (BrokenPipeError, ConnectionResetError):
+        return
 
 
 def read_json(handler: BaseHTTPRequestHandler) -> dict[str, Any]:
@@ -47,6 +53,16 @@ def read_json(handler: BaseHTTPRequestHandler) -> dict[str, Any]:
 def position_id(moves: list[str]) -> str:
     raw = "\n".join(moves).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()[:16]
+
+
+def write_event(payload: dict[str, Any]) -> None:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    event = {
+        "ts": time.time(),
+        **payload,
+    }
+    with EVENT_LOG.open("a", encoding="utf-8") as file:
+        file.write(json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n")
 
 
 class XiangqiHandler(BaseHTTPRequestHandler):
@@ -82,7 +98,12 @@ class XiangqiHandler(BaseHTTPRequestHandler):
             if path == "/api/position":
                 self.handle_position()
                 return
+            if path == "/api/log":
+                self.handle_log()
+                return
             json_response(self, 404, {"error": "not found"})
+        except (BrokenPipeError, ConnectionResetError):
+            return
         except ValueError as exc:
             json_response(self, 400, {"error": str(exc)})
         except Exception as exc:
@@ -154,6 +175,13 @@ class XiangqiHandler(BaseHTTPRequestHandler):
             **analysis,
         })
 
+    def handle_log(self) -> None:
+        payload = read_json(self)
+        if not isinstance(payload, dict):
+            raise ValueError("log payload must be an object")
+        write_event(payload)
+        json_response(self, 200, {"ok": True})
+
     def serve_static(self, path: str, head_only: bool = False) -> None:
         if path in {"", "/"}:
             file_path = FRONTEND_DIR / "index.html"
@@ -178,7 +206,10 @@ class XiangqiHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         if not head_only:
-            self.wfile.write(data)
+            try:
+                self.wfile.write(data)
+            except (BrokenPipeError, ConnectionResetError):
+                return
 
 
 def normalize_moves(raw_moves: Any) -> list[str]:

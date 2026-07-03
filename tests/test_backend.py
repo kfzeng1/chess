@@ -5,12 +5,13 @@ import os
 import re
 import threading
 import unittest
+import uuid
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 from web.backend.engine import SearchLimit, build_lines, normalize_bestmove, parse_info
-from web.backend.server import XiangqiHandler
+from web.backend.server import EVENT_LOG, XiangqiHandler
 from web.backend.xiangqi import Piece, board_after, is_in_check, legal_moves, move_rows, moves_to_chinese, side_to_move, validate_legal_sequence
 
 
@@ -259,6 +260,21 @@ class ServerApiTest(unittest.TestCase):
         self.assertEqual(data["lines"][0]["score"]["engineSide"], "black")
         self.assertLess(data["lines"][0]["score"]["value"], 0)
         self.assertGreater(data["lines"][0]["wdl"][2], data["lines"][0]["wdl"][0])
+
+    def test_log_endpoint_writes_jsonl_event(self) -> None:
+        event_type = f"test-event-{uuid.uuid4()}"
+        status, data = self.request("POST", "/api/log", {
+            "type": event_type,
+            "positionId": "abc",
+            "moves": ["h2e2"],
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(data["ok"])
+        self.assertTrue(EVENT_LOG.exists())
+        event = json.loads(EVENT_LOG.read_text(encoding="utf-8").splitlines()[-1])
+        self.assertEqual(event["type"], event_type)
+        self.assertEqual(event["positionId"], "abc")
+        self.assertIn("ts", event)
 
 
 class FrontendReferenceTest(unittest.TestCase):

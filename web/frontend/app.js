@@ -84,6 +84,32 @@ async function api(path, payload) {
   return data;
 }
 
+function eventPayload(extra = {}) {
+  return {
+    moves: [...state.moves],
+    moveCount: state.moves.length,
+    sideToMove: state.sideToMove,
+    positionId: state.positionId,
+    generation: state.generation,
+    autoMode: state.autoMode,
+    players: { ...state.players },
+    analysisKey: state.analysisKey,
+    analysisInFlight: state.analysisInFlight,
+    pendingActions: Array.from(state.pendingProtectedActions.keys()),
+    ...extra,
+  };
+}
+
+function logEvent(type, extra = {}) {
+  fetch("/api/log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(eventPayload({ type, ...extra })),
+  }).catch((error) => {
+    console.warn("event log failed", error);
+  });
+}
+
 function renderBoard() {
   el.board.querySelectorAll(".piece,.square-target,.hint").forEach((node) => node.remove());
   for (let f = 0; f < 9; f += 1) {
@@ -184,6 +210,7 @@ function addAudit(message, mismatch = false) {
   state.auditLogs.unshift({ stamp, message, mismatch });
   state.auditLogs = state.auditLogs.slice(0, 8);
   renderAudit();
+  logEvent(mismatch ? "audit-mismatch" : "audit", { message, mismatch });
 }
 
 function resetAudit() {
@@ -206,6 +233,7 @@ function setAutoMode(enabled) {
   el.autoMode.setAttribute("aria-pressed", state.autoMode ? "true" : "false");
   if (!state.autoMode) clearTimeout(state.autoTimer);
   else scheduleAuto();
+  logEvent("auto-mode", { enabled });
 }
 
 function resetAnalysis() {
@@ -216,12 +244,14 @@ function resetAnalysis() {
 
 async function runAfterAnalysis(key, action) {
   state.pendingProtectedActions.set(key, action);
+  logEvent("protected-action-queued", { key });
   if (state.analysisInFlight || state.flushingProtectedActions) return;
   state.flushingProtectedActions = true;
   try {
     while (!state.analysisInFlight && state.pendingProtectedActions.size > 0) {
       const [[nextKey, nextAction]] = state.pendingProtectedActions;
       state.pendingProtectedActions.delete(nextKey);
+      logEvent("protected-action-run", { key: nextKey });
       await nextAction();
     }
   } finally {
@@ -237,6 +267,7 @@ function flushProtectedActions() {
       while (!state.analysisInFlight && state.pendingProtectedActions.size > 0) {
         const [[nextKey, nextAction]] = state.pendingProtectedActions;
         state.pendingProtectedActions.delete(nextKey);
+        logEvent("protected-action-run", { key: nextKey });
         await nextAction();
       }
     } finally {
@@ -247,6 +278,7 @@ function flushProtectedActions() {
 
 function scheduleUndoAnalysis() {
   clearTimeout(state.undoTimer);
+  logEvent("undo-analysis-scheduled", { delayMs: 500 });
   state.undoTimer = setTimeout(() => {
     state.undoTimer = null;
     refreshAnalysis().then(() => scheduleAuto()).catch(showError);
@@ -261,6 +293,7 @@ async function restoreToMoves(moves) {
   state.selected = null;
   state.analysis = null;
   state.analysisKey = "";
+  logEvent("restore-position", { restoreMoves: [...moves] });
   await syncPosition();
   await refreshAnalysis();
 }
@@ -273,6 +306,7 @@ async function handleMismatch(message, restoreMoves = state.moves) {
   try {
     clearTimeout(state.undoTimer);
     state.pendingProtectedActions.clear();
+    logEvent("mismatch", { message, restoreMoves: targetMoves });
     setAutoMode(false);
     await restoreToMoves(targetMoves);
     window.alert(`检测到代走不匹配：${message}\n\n已关闭自动代走，并回到触发检查时的局面。`);
@@ -356,10 +390,12 @@ async function movePiece(move) {
   state.analysis = null;
   state.analysisKey = "";
   try {
+    logEvent("move-attempt", { move });
     await syncPosition();
     await refreshAnalysis();
     scheduleAuto();
   } catch (error) {
+    logEvent("move-reverted", { move, error: error.message });
     state.moves = previousMoves;
     state.lastMove = previousLastMove;
     state.generation = previousGeneration + 1;
@@ -415,12 +451,24 @@ async function refreshAnalysis() {
   const positionIdSnapshot = state.positionId;
   state.analysisInFlightCount += 1;
   state.analysisInFlight = true;
+  logEvent("analysis-start", {
+    requestMoves: movesSnapshot,
+    requestPositionId: positionIdSnapshot,
+    side: sideSnapshot,
+    limit: currentLimit(sideSnapshot),
+  });
   el.thinking.textContent = "思考中";
   el.engineStatus.textContent = "Pikafish thinking";
   try {
     const data = await api("/api/analyze", { moves: movesSnapshot, positionId: positionIdSnapshot, limit: currentLimit(sideSnapshot), multipv: 5 });
     if (key !== movesKey() || generationSnapshot !== state.generation) {
       addAudit("丢弃过期分析");
+      logEvent("analysis-stale", {
+        requestMoves: movesSnapshot,
+        requestPositionId: positionIdSnapshot,
+        currentPositionId: state.positionId,
+        currentMoves: [...state.moves],
+      });
       return false;
     }
     if (data.positionId !== state.positionId) {
@@ -430,6 +478,15 @@ async function refreshAnalysis() {
     state.analysis = data;
     state.analysisKey = key;
     renderAnalysis();
+    logEvent("analysis-complete", {
+      requestMoves: movesSnapshot,
+      responsePositionId: data.positionId,
+      bestmove: data.bestmove || "",
+      bestmoveCn: data.bestmove_cn || "",
+      lineCount: data.lines?.length || 0,
+      score: data.lines?.[0]?.score || null,
+      wdl: data.lines?.[0]?.wdl || null,
+    });
     el.thinking.textContent = "待命";
     el.engineStatus.textContent = "Pikafish ready";
     return true;
@@ -454,10 +511,16 @@ async function playAiMove() {
   }
   if (generationSnapshot !== state.generation) {
     addAudit("代走任务过期");
+    logEvent("ai-move-stale", { requestMoves: movesSnapshot });
     return;
   }
   if (state.analysis?.positionId === state.positionId && state.analysis?.bestmove && state.legalMoves.includes(state.analysis.bestmove)) {
     addAudit(`代走 ${state.analysis.bestmove}`);
+    logEvent("ai-move-approved", {
+      move: state.analysis.bestmove,
+      positionId: state.positionId,
+      legalMoves: state.legalMoves.length,
+    });
     await movePiece(state.analysis.bestmove);
   } else if (state.analysis?.bestmove) {
     await handleMismatch("bestmove 审核失败，重新分析", movesSnapshot);
@@ -477,6 +540,7 @@ function scheduleAuto() {
       playAiMove().catch(showError);
     }
   }, delay);
+  logEvent("auto-scheduled", { delayMs: delay, side: sideSnapshot });
 }
 
 function updateAiSearch(side) {
@@ -521,6 +585,7 @@ function bindControls() {
     state.lastClockTick = Date.now();
     resetAudit();
     addAudit("新局");
+    logEvent("new-game");
     syncPosition().then(() => refreshAnalysis()).then(() => scheduleAuto()).catch(showError);
   });
   document.getElementById("undoMove").addEventListener("click", () => {
@@ -530,10 +595,12 @@ function bindControls() {
     state.moves.pop();
     state.lastMove = state.moves.at(-1) || null;
     resetAnalysis();
+    logEvent("undo-click");
     syncPosition().then(() => scheduleUndoAnalysis()).catch(showError);
   });
   document.getElementById("flipBoard").addEventListener("click", () => {
     state.flipped = !state.flipped;
+    logEvent("flip-board", { flipped: state.flipped });
     renderBoard();
   });
   el.autoMode.addEventListener("click", () => {
