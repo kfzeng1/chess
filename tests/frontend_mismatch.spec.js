@@ -102,17 +102,34 @@ test("mobile layout keeps board primary and controls usable", async ({ page }) =
 
   const viewport = page.viewportSize();
   const board = await page.locator("#board").boundingBox();
-  const controls = await page.locator(".controls-panel").boundingBox();
-  const rightPanel = await page.locator(".panel.right").boundingBox();
   const bodyWidth = await page.evaluate(() => document.documentElement.scrollWidth);
 
   expect(viewport).toEqual({ width: 390, height: 844 });
   expect(bodyWidth).toBeLessThanOrEqual(390);
   expect(board.width).toBeGreaterThan(350);
   expect(board.y).toBeLessThan(230);
-  expect(controls.y).toBeGreaterThan(board.y + board.height - 4);
-  expect(rightPanel.y).toBeGreaterThan(controls.y);
-  await expect(page.locator("#auditSection")).toBeHidden();
+  await expect(page.locator(".mobile-board-actions")).toBeVisible();
+  await expect(page.getByRole("button", { name: "新局" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "悔棋" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "翻转" })).toBeVisible();
+
+  const closedLeft = await page.locator(".controls-panel").boundingBox();
+  expect(closedLeft.x).toBeLessThan(-250);
+  await page.getByRole("button", { name: "配置", exact: true }).click();
+  await expect.poll(async () => (await page.locator(".controls-panel").boundingBox()).x).toBeGreaterThanOrEqual(-1);
   await expect(page.getByRole("button", { name: "自动代走：开" })).toBeVisible();
   await expect(page.getByRole("button", { name: "本步 AI" })).toBeVisible();
+  await page.getByLabel("关闭配置").click();
+
+  const closedRight = await page.locator(".panel.right").boundingBox();
+  expect(closedRight.x).toBeGreaterThan(380);
+  await page.getByRole("button", { name: "分析", exact: true }).click();
+  await expect.poll(async () => {
+    const box = await page.locator(".panel.right").boundingBox();
+    return Math.round(box.x + box.width);
+  }).toBeLessThanOrEqual(391);
+  const openRight = await page.locator(".panel.right").boundingBox();
+  expect(openRight.x + openRight.width).toBeLessThanOrEqual(391);
+  await expect(page.locator("#auditSection")).toBeHidden();
+  await expect(page.locator("#recommendations")).toBeVisible();
 });

@@ -15,12 +15,19 @@
           <div class="brand-mark">象</div>
           <h1>象棋 AI 对弈</h1>
         </div>
+        <div class="mobile-drawer-actions" aria-label="移动端面板">
+          <button class="drawer-tab left-tab" type="button" data-open-drawer="left">配置</button>
+          <button class="drawer-tab right-tab" type="button" data-open-drawer="right">分析</button>
+        </div>
         <div class="engine-pill"><span class="dot"></span><span id="engineStatus">Pikafish ready</span></div>
       </header>
 
       <main class="workspace">
         <aside class="panel left controls-panel">
-          <div class="panel-header"><div class="panel-title">对局控制</div></div>
+          <div class="panel-header">
+            <div class="panel-title">对局配置</div>
+            <button class="drawer-close" type="button" data-close-drawer aria-label="关闭配置">×</button>
+          </div>
           <div class="panel-body stack">
             <div class="control-primary">
               <div class="toolbar">
@@ -112,12 +119,20 @@
               <img class="board-img" src="/assets/board.png" alt="象棋棋盘">
             </div>
           </div>
+          <div class="mobile-board-actions" aria-label="棋局快捷操作">
+            <div class="toolbar">
+              <div class="tool-item"><div class="tool-label">新局</div><button class="icon-btn" id="newGameMobile" aria-label="新局">↻</button></div>
+              <div class="tool-item"><div class="tool-label">悔棋</div><button class="icon-btn" id="undoMoveMobile" aria-label="悔棋">↶</button></div>
+              <div class="tool-item"><div class="tool-label">翻转</div><button class="icon-btn" id="flipBoardMobile" aria-label="翻转">⇅</button></div>
+            </div>
+          </div>
         </section>
 
         <aside class="panel right">
           <div class="panel-header">
             <div class="panel-title">AI 分析</div>
             <span id="nodesText">0 nodes</span>
+            <button class="drawer-close" type="button" data-close-drawer aria-label="关闭分析">×</button>
           </div>
           <div class="panel-body analysis">
             <section class="notation-control">
@@ -154,6 +169,7 @@
           </div>
         </aside>
       </main>
+      <button class="drawer-overlay" type="button" data-close-drawer aria-label="关闭侧栏"></button>
     </div>
     <script src="/app.js"></script>
   </body>

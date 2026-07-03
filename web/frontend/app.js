@@ -571,37 +571,66 @@ function showError(error) {
   console.error(error);
 }
 
+function closeDrawers() {
+  document.body.classList.remove("drawer-open", "drawer-left-open", "drawer-right-open");
+}
+
+function openDrawer(side) {
+  document.body.classList.toggle("drawer-left-open", side === "left");
+  document.body.classList.toggle("drawer-right-open", side === "right");
+  document.body.classList.add("drawer-open");
+}
+
+function startNewGame() {
+  clearTimeout(state.autoTimer);
+  clearTimeout(state.undoTimer);
+  state.pendingProtectedActions.clear();
+  state.generation += 1;
+  state.moves = [];
+  state.selected = null;
+  state.lastMove = null;
+  resetAnalysis();
+  state.clocks = { red: 0, black: 0 };
+  state.lastClockTick = Date.now();
+  resetAudit();
+  addAudit("新局");
+  logEvent("new-game");
+  closeDrawers();
+  syncPosition().then(() => refreshAnalysis()).then(() => scheduleAuto()).catch(showError);
+}
+
+function undoMove() {
+  clearTimeout(state.autoTimer);
+  if (state.moves.length === 0) return;
+  state.generation += 1;
+  state.moves.pop();
+  state.lastMove = state.moves.at(-1) || null;
+  resetAnalysis();
+  logEvent("undo-click");
+  syncPosition().then(() => scheduleUndoAnalysis()).catch(showError);
+}
+
+function flipBoard() {
+  state.flipped = !state.flipped;
+  logEvent("flip-board", { flipped: state.flipped });
+  renderBoard();
+}
+
 function bindControls() {
-  document.getElementById("newGame").addEventListener("click", () => {
-    clearTimeout(state.autoTimer);
-    clearTimeout(state.undoTimer);
-    state.pendingProtectedActions.clear();
-    state.generation += 1;
-    state.moves = [];
-    state.selected = null;
-    state.lastMove = null;
-    resetAnalysis();
-    state.clocks = { red: 0, black: 0 };
-    state.lastClockTick = Date.now();
-    resetAudit();
-    addAudit("新局");
-    logEvent("new-game");
-    syncPosition().then(() => refreshAnalysis()).then(() => scheduleAuto()).catch(showError);
+  ["newGame", "newGameMobile"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("click", startNewGame);
   });
-  document.getElementById("undoMove").addEventListener("click", () => {
-    clearTimeout(state.autoTimer);
-    if (state.moves.length === 0) return;
-    state.generation += 1;
-    state.moves.pop();
-    state.lastMove = state.moves.at(-1) || null;
-    resetAnalysis();
-    logEvent("undo-click");
-    syncPosition().then(() => scheduleUndoAnalysis()).catch(showError);
+  ["undoMove", "undoMoveMobile"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("click", undoMove);
   });
-  document.getElementById("flipBoard").addEventListener("click", () => {
-    state.flipped = !state.flipped;
-    logEvent("flip-board", { flipped: state.flipped });
-    renderBoard();
+  ["flipBoard", "flipBoardMobile"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("click", flipBoard);
+  });
+  document.querySelectorAll("[data-open-drawer]").forEach((button) => {
+    button.addEventListener("click", () => openDrawer(button.dataset.openDrawer));
+  });
+  document.querySelectorAll("[data-close-drawer]").forEach((button) => {
+    button.addEventListener("click", closeDrawers);
   });
   el.autoMode.addEventListener("click", () => {
     runAfterAnalysis("auto-mode", async () => setAutoMode(!state.autoMode)).catch(showError);
