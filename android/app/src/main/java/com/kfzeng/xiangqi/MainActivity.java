@@ -18,6 +18,7 @@ import com.kfzeng.xiangqi.backend.ApkBackend;
 import com.kfzeng.xiangqi.core.GameState;
 import com.kfzeng.xiangqi.engine.AnalysisLine;
 import com.kfzeng.xiangqi.engine.AnalysisResult;
+import com.kfzeng.xiangqi.engine.SearchLimit;
 import com.kfzeng.xiangqi.ui.BoardView;
 
 import java.util.ArrayList;
@@ -26,6 +27,8 @@ import java.util.Locale;
 public class MainActivity extends Activity {
     interface ToggleSetter { void set(boolean value); }
     interface SliderFormatter { String format(int value); }
+    interface SliderChange { void set(int value); }
+    interface ModeSetter { void set(String mode); }
 
     private GameState game;
     private BoardView boardView;
@@ -50,8 +53,12 @@ public class MainActivity extends Activity {
     private boolean flipped = false;
     private boolean engineBusy = false;
     private int analysisSerial = 0;
-    private int redAiMoveTimeMs = 1000;
-    private int blackAiMoveTimeMs = 1000;
+    private String redSearchMode = "movetime";
+    private int redMoveTimeMs = 1000;
+    private int redDepth = 12;
+    private String blackSearchMode = "depth";
+    private int blackMoveTimeMs = 2000;
+    private int blackDepth = 16;
     private int delegateDelayMs = 1000;
     private boolean notationUci = false;
 
@@ -210,13 +217,13 @@ public class MainActivity extends Activity {
             delegateDelayMs = value;
             return String.format(Locale.US, "%.1fs", value / 1000f);
         }));
-        body.addView(sliderRow("红方 AI 搜索", "红方走棋时使用的 Pikafish 时间", 100, 5000, 100, redAiMoveTimeMs, value -> {
-            redAiMoveTimeMs = value;
-            return String.format(Locale.US, "%.1fs · go movetime %d", value / 1000f, value);
+        body.addView(aiSearchCard("red", "红方 AI 搜索", () -> {
+            dialog.dismiss();
+            showConfigDialog();
         }));
-        body.addView(sliderRow("黑方 AI 搜索", "黑方走棋时使用的 Pikafish 时间", 100, 5000, 100, blackAiMoveTimeMs, value -> {
-            blackAiMoveTimeMs = value;
-            return String.format(Locale.US, "%.1fs · go movetime %d", value / 1000f, value);
+        body.addView(aiSearchCard("black", "黑方 AI 搜索", () -> {
+            dialog.dismiss();
+            showConfigDialog();
         }));
         body.addView(section("引擎", "Pikafish dev-20260628-553282ed / Android arm64"));
         dialog.show();
@@ -444,6 +451,124 @@ public class MainActivity extends Activity {
         return row;
     }
 
+    private View aiSearchCard(String side, String title, Runnable redraw) {
+        boolean red = "red".equals(side);
+        String mode = red ? redSearchMode : blackSearchMode;
+        int movetime = red ? redMoveTimeMs : blackMoveTimeMs;
+        int depth = red ? redDepth : blackDepth;
+        SearchLimit limit = "depth".equals(mode) ? SearchLimit.depth(depth) : SearchLimit.movetime(movetime);
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(10), dp(9), dp(10), dp(9));
+        card.setBackground(makeRound(0xffffffff, 0xffe2d9ce, dp(8)));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label = text(title, 13, 0xff29241f, true);
+        header.addView(label, new LinearLayout.LayoutParams(0, dp(28), 1));
+        TextView value = text(limit.label(), 12, 0xff766b5f, false);
+        value.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        header.addView(value, new LinearLayout.LayoutParams(dp(92), dp(28)));
+        card.addView(header);
+
+        card.addView(modeTabs(mode, red ? 0xffc7352d : 0xff282522, selected -> {
+            if (red) redSearchMode = selected;
+            else blackSearchMode = selected;
+            redraw.run();
+        }));
+
+        TextView command = text(limit.goCommand(), 11, 0xff766b5f, false);
+        command.setPadding(dp(8), dp(5), dp(8), dp(5));
+        command.setBackground(makeRound(0xfff4efe7, 0xffe2d9ce, dp(6)));
+
+        if ("depth".equals(mode)) {
+            card.addView(compactSlider("depth " + depth, "固定搜索深度", 1, 30, 1, depth,
+                    next -> "depth " + next,
+                    next -> {
+                        if (red) redDepth = next;
+                        else blackDepth = next;
+                        command.setText(searchLimit(side).goCommand());
+                        value.setText(searchLimit(side).label());
+                    }));
+        } else {
+            card.addView(compactSlider(String.format(Locale.US, "%.1fs", movetime / 1000f), "每步搜索时间", 100, 30000, 100, movetime,
+                    next -> String.format(Locale.US, "%.1fs", next / 1000f),
+                    next -> {
+                        if (red) redMoveTimeMs = next;
+                        else blackMoveTimeMs = next;
+                        command.setText(searchLimit(side).goCommand());
+                        value.setText(searchLimit(side).label());
+                    }));
+        }
+
+        card.addView(command, new LinearLayout.LayoutParams(-1, dp(30)));
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.bottomMargin = dp(8);
+        card.setLayoutParams(lp);
+        return card;
+    }
+
+    private View modeTabs(String mode, int activeColor, ModeSetter setter) {
+        LinearLayout segmented = new LinearLayout(this);
+        segmented.setOrientation(LinearLayout.HORIZONTAL);
+        segmented.setPadding(dp(3), dp(3), dp(3), dp(3));
+        segmented.setBackground(makeRound(0xfff4efe7, 0xffd2c7b8, dp(8)));
+        Button time = smallButton("时间");
+        Button depth = smallButton("深度");
+        final String[] current = new String[] { mode };
+        Runnable paint = () -> {
+            boolean timeActive = "movetime".equals(current[0]);
+            time.setTextColor(timeActive ? 0xffffffff : 0xff766b5f);
+            time.setBackground(makeRound(timeActive ? activeColor : 0x00ffffff, timeActive ? activeColor : 0x00ffffff, dp(6)));
+            depth.setTextColor(!timeActive ? 0xffffffff : 0xff766b5f);
+            depth.setBackground(makeRound(!timeActive ? activeColor : 0x00ffffff, !timeActive ? activeColor : 0x00ffffff, dp(6)));
+        };
+        time.setOnClickListener(v -> {
+            current[0] = "movetime";
+            paint.run();
+            setter.set("movetime");
+        });
+        depth.setOnClickListener(v -> {
+            current[0] = "depth";
+            paint.run();
+            setter.set("depth");
+        });
+        paint.run();
+        segmented.addView(time, new LinearLayout.LayoutParams(0, dp(34), 1));
+        segmented.addView(depth, new LinearLayout.LayoutParams(0, dp(34), 1));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(40));
+        lp.topMargin = dp(6);
+        lp.bottomMargin = dp(4);
+        segmented.setLayoutParams(lp);
+        return segmented;
+    }
+
+    private View compactSlider(String title, String subtitle, int min, int max, int step, int current, SliderFormatter formatter, SliderChange change) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        TextView label = text(title + "\n" + subtitle, 12, 0xff29241f, false);
+        box.addView(label);
+        SeekBar seek = new SeekBar(this);
+        seek.setMax((max - min) / step);
+        seek.setProgress((current - min) / step);
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int value = min + progress * step;
+                label.setText(formatter.format(value) + "\n" + subtitle);
+                if (fromUser) change.set(value);
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                int value = min + seekBar.getProgress() * step;
+                change.set(value);
+            }
+        });
+        box.addView(seek);
+        return box;
+    }
+
     private View sliderRow(String title, String subtitle, int min, int max, int step, int current, SliderFormatter formatter) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
@@ -512,9 +637,10 @@ public class MainActivity extends Activity {
         manualAiButton.setEnabled(false);
         autoButton.setEnabled(false);
         analysisSummary = "Pikafish 正在计算...";
+        final SearchLimit limit = searchLimit(moves.size() % 2 == 0 ? "red" : "black");
         new Thread(() -> {
             try {
-                AnalysisResult result = backend.analyze(moves, currentAiMoveTimeMs());
+                AnalysisResult result = backend.analyze(moves, limit);
                 runOnUiThread(() -> applyAnalysis(serial, requestPositionId, result, playBestMove));
             } catch (Exception ex) {
                 runOnUiThread(() -> {
@@ -529,8 +655,11 @@ public class MainActivity extends Activity {
         }).start();
     }
 
-    private int currentAiMoveTimeMs() {
-        return "red".equals(game.sideToMove()) ? redAiMoveTimeMs : blackAiMoveTimeMs;
+    private SearchLimit searchLimit(String side) {
+        boolean red = "red".equals(side);
+        String mode = red ? redSearchMode : blackSearchMode;
+        if ("depth".equals(mode)) return SearchLimit.depth(red ? redDepth : blackDepth);
+        return SearchLimit.movetime(red ? redMoveTimeMs : blackMoveTimeMs);
     }
 
     private void applyAnalysis(int serial, String requestPositionId, AnalysisResult result, boolean playBestMove) {

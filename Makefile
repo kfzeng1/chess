@@ -1,6 +1,6 @@
 GRADLE ?= /home/zkf/.gradle/wrapper/dists/gradle-8.14.3-all/10utluxaxniiv4wxiphsi49nj/gradle-8.14.3/bin/gradle
 
-.PHONY: run run-lan run-fake run-fake-lan test test-frontend apk-debug screenshot screenshot-mobile clean
+.PHONY: run run-lan run-fake run-fake-lan test test-frontend test-android-engine apk-debug screenshot screenshot-mobile clean
 
 run:
 	python3 -m web.backend.server
@@ -19,6 +19,15 @@ test:
 
 test-frontend:
 	npm run test:frontend
+
+test-android-engine:
+	rm -rf /tmp/xiangqi-android-engine-test
+	mkdir -p /tmp/xiangqi-android-engine-test
+	javac -d /tmp/xiangqi-android-engine-test \
+		android/app/src/main/java/com/kfzeng/xiangqi/core/*.java \
+		android/app/src/main/java/com/kfzeng/xiangqi/engine/*.java \
+		tools/android-engine-test/EngineSmokeTest.java
+	java -cp /tmp/xiangqi-android-engine-test EngineSmokeTest
 
 apk-debug:
 	$(GRADLE) -p android assembleDebug

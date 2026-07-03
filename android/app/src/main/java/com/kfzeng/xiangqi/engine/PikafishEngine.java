@@ -43,7 +43,7 @@ public class PikafishEngine {
         readUntil("readyok");
     }
 
-    public synchronized AnalysisResult analyze(List<String> moves, int movetimeMs) throws IOException {
+    public synchronized AnalysisResult analyze(List<String> moves, SearchLimit limit) throws IOException {
         int multipv = 5;
         send("setoption name MultiPV value " + multipv);
         send("isready");
@@ -54,7 +54,7 @@ public class PikafishEngine {
             for (String move : moves) position.append(move).append(' ');
         }
         send(position.toString().trim());
-        send("go movetime " + movetimeMs);
+        send(limit.goCommand());
 
         String bestMove = "";
         HashMap<Integer, AnalysisLine> infos = new HashMap<>();

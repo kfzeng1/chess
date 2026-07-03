@@ -24,6 +24,9 @@ depend on a browser, network access, or the Python web backend once installed.
 - The UI supports red/black AI toggles, automatic delegated moves, manual
   `本步 AI`, delegated-move delay, WDL/score/PV display, and Chinese/UCI
   notation switching.
+- Red and black AI strength controls match the web frontend. Each side can use
+  time mode (`go movetime <milliseconds>`) or depth mode (`go depth <plies>`),
+  with the command shown directly in the configuration drawer.
 
 ## Build
 
@@ -71,12 +74,31 @@ The APK keeps the same core behavior as the web client:
   `bestmove`, `score`, `wdl`, `pv`, and generated Chinese PV text.
 - Score and WDL are normalized to red-side perspective, matching the web
   backend.
+- Red/black search limits use the same defaults and ranges as the web UI:
+  red starts at `go movetime 1000`, black starts at `go depth 16`, time ranges
+  from 0.1s to 30s, and depth ranges from 1 to 30.
 - `本步 AI` plays the current best move for the side to move.
 - `自动代走` only plays after analysis is ready and the configured minimum delay
   has elapsed.
 - During the delay, changing red/black AI settings or disabling automatic
   delegated moves affects the next decision.
 - Chinese and UCI notation can be switched in the analysis panel.
+
+## Engine Parser Test
+
+The emulator available locally is `x86_64`, so it cannot execute the bundled
+Android `arm64-v8a/libpikafish.so`. To test the shared Android Java engine
+parser without an arm64 phone, run the Linux Pikafish binary through a CLI smoke
+test:
+
+```bash
+make test-android-engine
+```
+
+This compiles the APK `core/` and `engine/` Java packages with `javac`, starts
+`engines/pikafish-avxvnni`, and verifies both `go depth ...` and
+`go movetime ...` requests, MultiPV parsing, bestmove parsing, score text, and
+WDL shape.
 
 ## Remaining Gaps
 

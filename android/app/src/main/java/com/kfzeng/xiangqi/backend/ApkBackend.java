@@ -5,6 +5,7 @@ import android.content.Context;
 import com.kfzeng.xiangqi.core.GameState;
 import com.kfzeng.xiangqi.engine.AnalysisResult;
 import com.kfzeng.xiangqi.engine.PikafishEngine;
+import com.kfzeng.xiangqi.engine.SearchLimit;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -27,8 +28,8 @@ public class ApkBackend {
         return game;
     }
 
-    public AnalysisResult analyze(List<String> moves, int movetimeMs) throws IOException {
-        return getEngine().analyze(moves, movetimeMs);
+    public AnalysisResult analyze(List<String> moves, SearchLimit limit) throws IOException {
+        return getEngine().analyze(moves, limit);
     }
 
     public String positionId(List<String> moves) {

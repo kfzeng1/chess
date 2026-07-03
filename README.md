@@ -57,6 +57,9 @@ The APK currently includes:
 - Native Java UI with board, pieces, red/black AI toggles, automatic delegated
   moves, manual `本步 AI`, WDL/score/PV display, and Chinese/UCI notation
   switching.
+- Red/black AI strength controls match the web app: each side supports
+  `go movetime <ms>` and `go depth <plies>` with the exact UCI command shown in
+  the configuration drawer.
 - Mobile layout mirrors the web mobile preview: top configuration/analysis
   actions, large board-first play area, bottom quick actions, status cards, and
   side drawers for configuration and analysis.
@@ -74,7 +77,12 @@ Recent emulator screenshots were captured for layout review:
 
 The local emulator used for screenshots is `x86_64`, while the bundled
 Pikafish binary is `arm64-v8a`; layout screenshots are valid, but real engine
-analysis should be tested on an arm64 Android phone.
+analysis should be tested on an arm64 Android phone. The shared Java engine
+parser can also be tested with the Linux Pikafish binary:
+
+```bash
+make test-android-engine
+```
 
 ## Web App
 
@@ -144,6 +152,7 @@ Run tests:
 ```bash
 make test
 npm run test:frontend
+make test-android-engine
 make apk-debug
 ```
 
