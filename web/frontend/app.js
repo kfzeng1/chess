@@ -37,15 +37,21 @@ const el = {
   board: document.getElementById("board"),
   turnText: document.getElementById("turnText"),
   turnStat: document.getElementById("turnStat"),
+  turnStatMobile: document.getElementById("turnStatMobile"),
   roundStat: document.getElementById("roundStat"),
+  roundStatMobile: document.getElementById("roundStatMobile"),
   redClock: document.getElementById("redClock"),
+  redClockMobile: document.getElementById("redClockMobile"),
   blackClock: document.getElementById("blackClock"),
+  blackClockMobile: document.getElementById("blackClockMobile"),
   moveCount: document.getElementById("moveCount"),
   thinking: document.getElementById("thinking"),
   redLabel: document.getElementById("redLabel"),
   blackLabel: document.getElementById("blackLabel"),
   autoMode: document.getElementById("autoMode"),
+  autoModeMobile: document.getElementById("autoModeMobile"),
   manualAi: document.getElementById("manualAi"),
+  manualAiMobile: document.getElementById("manualAiMobile"),
   delayRange: document.getElementById("delayRange"),
   delayLabel: document.getElementById("delayLabel"),
   pvLine: document.getElementById("pvLine"),
@@ -166,11 +172,14 @@ function renderStatus() {
     el.turnText.textContent = `${sideName(state.sideToMove)}回合`;
   }
   el.turnStat.textContent = sideName(state.sideToMove);
+  el.turnStatMobile.textContent = sideName(state.sideToMove);
   el.roundStat.textContent = String(state.moves.length);
+  el.roundStatMobile.textContent = String(state.moves.length);
   el.moveCount.textContent = `${state.moves.length} 步`;
   el.redLabel.textContent = state.players.red === "human" ? "Human" : "Pikafish";
   el.blackLabel.textContent = state.players.black === "human" ? "Human" : "Pikafish";
   el.manualAi.disabled = state.gameOver;
+  el.manualAiMobile.disabled = state.gameOver;
   renderClocks();
 }
 
@@ -182,8 +191,12 @@ function formatClock(ms) {
 }
 
 function renderClocks() {
-  el.redClock.textContent = formatClock(state.clocks.red);
-  el.blackClock.textContent = formatClock(state.clocks.black);
+  const redClock = formatClock(state.clocks.red);
+  const blackClock = formatClock(state.clocks.black);
+  el.redClock.textContent = redClock;
+  el.redClockMobile.textContent = redClock;
+  el.blackClock.textContent = blackClock;
+  el.blackClockMobile.textContent = blackClock;
 }
 
 function tickClock() {
@@ -228,9 +241,11 @@ function renderAudit() {
 
 function setAutoMode(enabled) {
   state.autoMode = enabled;
-  el.autoMode.textContent = state.autoMode ? "自动代走：开" : "自动代走：关";
-  el.autoMode.classList.toggle("is-off", !state.autoMode);
-  el.autoMode.setAttribute("aria-pressed", state.autoMode ? "true" : "false");
+  [el.autoMode, el.autoModeMobile].forEach((button) => {
+    button.textContent = state.autoMode ? "自动代走：开" : "自动代走：关";
+    button.classList.toggle("is-off", !state.autoMode);
+    button.setAttribute("aria-pressed", state.autoMode ? "true" : "false");
+  });
   if (!state.autoMode) clearTimeout(state.autoTimer);
   else scheduleAuto();
   logEvent("auto-mode", { enabled });
@@ -632,10 +647,14 @@ function bindControls() {
   document.querySelectorAll("[data-close-drawer]").forEach((button) => {
     button.addEventListener("click", closeDrawers);
   });
-  el.autoMode.addEventListener("click", () => {
-    runAfterAnalysis("auto-mode", async () => setAutoMode(!state.autoMode)).catch(showError);
+  [el.autoMode, el.autoModeMobile].forEach((button) => {
+    button.addEventListener("click", () => {
+      runAfterAnalysis("auto-mode", async () => setAutoMode(!state.autoMode)).catch(showError);
+    });
   });
-  el.manualAi.addEventListener("click", () => runAfterAnalysis("manual-ai", () => playAiMove()).catch(showError));
+  [el.manualAi, el.manualAiMobile].forEach((button) => {
+    button.addEventListener("click", () => runAfterAnalysis("manual-ai", () => playAiMove()).catch(showError));
+  });
   el.delayRange.addEventListener("input", () => {
     runAfterAnalysis("delay", async () => {
       el.delayLabel.textContent = `${Number(el.delayRange.value).toFixed(1)}s 最小间隔`;

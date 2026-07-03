@@ -112,13 +112,21 @@ test("mobile layout keeps board primary and controls usable", async ({ page }) =
   await expect(page.getByRole("button", { name: "新局" })).toBeVisible();
   await expect(page.getByRole("button", { name: "悔棋" })).toBeVisible();
   await expect(page.getByRole("button", { name: "翻转" })).toBeVisible();
+  await expect(page.locator("#autoModeMobile")).toHaveText("自动代走：开");
+  await expect(page.locator("#autoModeMobile")).toBeVisible();
+  await expect(page.locator("#manualAiMobile")).toBeVisible();
+  await expect(page.locator("#turnStatMobile")).toHaveText("红方");
+  await expect(page.locator("#roundStatMobile")).toHaveText("0");
+  await expect(page.locator("#redClockMobile")).toContainText("00:");
+  await expect(page.locator("#blackClockMobile")).toHaveText("00:00");
 
   const closedLeft = await page.locator(".controls-panel").boundingBox();
   expect(closedLeft.x).toBeLessThan(-250);
   await page.getByRole("button", { name: "配置", exact: true }).click();
   await expect.poll(async () => (await page.locator(".controls-panel").boundingBox()).x).toBeGreaterThanOrEqual(-1);
-  await expect(page.getByRole("button", { name: "自动代走：开" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "本步 AI" })).toBeVisible();
+  await expect(page.locator(".controls-panel #autoMode")).toBeHidden();
+  await expect(page.locator(".controls-panel #manualAi")).toBeHidden();
+  await expect(page.locator(".controls-panel .status-grid")).toBeHidden();
   await page.getByLabel("关闭配置").click();
 
   const closedRight = await page.locator(".panel.right").boundingBox();
