@@ -5,14 +5,22 @@ depend on a browser, network access, or the Python web backend once installed.
 
 ## Current APK State
 
-- Native Java Activity under `android/app`.
+- Native Java app under `android/app`, split into a UI layer and a local APK
+  backend layer.
+- `MainActivity` owns screen layout and user interaction.
+- `backend/ApkBackend` owns local analysis requests and engine lifecycle.
+- `engine/` owns Pikafish UCI startup, MultiPV parsing, score/WDL normalization,
+  and analysis result models.
+- `core/` owns Xiangqi board state, legal moves, and Chinese notation.
+- `ui/BoardView` owns board rendering and touch hit-testing.
 - Board and piece assets are bundled from the latest PNG assets.
 - Pikafish dev-20260628-553282ed is rebuilt for Android arm64 and bundled as
   `lib/arm64-v8a/libpikafish.so`.
 - `pikafish.nnue` is bundled as an asset, copied to app-private storage on
   first use, and passed to Pikafish via `EvalFile`.
 - The app starts a local UCI engine process with `ProcessBuilder`.
-- AI analysis parses `bestmove`, `score`, `wdl`, and `pv`.
+- AI analysis parses `bestmove`, `score`, `wdl`, `depth`, `nodes`, `nps`, `time`,
+  and up to 5 MultiPV lines.
 - The UI supports red/black AI toggles, automatic delegated moves, manual
   `本步 AI`, delegated-move delay, WDL/score/PV display, and Chinese/UCI
   notation switching.
@@ -59,6 +67,10 @@ The APK keeps the same core behavior as the web client:
 
 - Moves are represented as UCI strings.
 - Each position can be analyzed independently.
+- Analysis follows the web backend model: result lines contain `multipv`,
+  `bestmove`, `score`, `wdl`, `pv`, and generated Chinese PV text.
+- Score and WDL are normalized to red-side perspective, matching the web
+  backend.
 - `本步 AI` plays the current best move for the side to move.
 - `自动代走` only plays after analysis is ready and the configured minimum delay
   has elapsed.
@@ -68,8 +80,9 @@ The APK keeps the same core behavior as the web client:
 
 ## Remaining Gaps
 
-- The web app still has richer MultiPV and audit-log UI. The APK focuses on the
-  playable offline loop first.
+- The APK still lacks the web audit-log panel, but the local backend now uses
+  the same analysis model, MultiPV behavior, and positionId-style stale-result
+  protection.
 - APK legal-move generation covers normal movement, blocking, flying general,
   and self-check filtering, but tournament repetition/perpetual-check rules are
   still not implemented.
