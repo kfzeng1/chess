@@ -27,6 +27,10 @@ depend on a browser, network access, or the Python web backend once installed.
 - Red and black AI strength controls match the web frontend. Each side can use
   time mode (`go movetime <milliseconds>`) or depth mode (`go depth <plies>`),
   with the command shown directly in the configuration drawer.
+- Web-parity behavior includes live red/black clocks, WDL percentage display,
+  protected control changes while analysis is running, 0.5s undo analysis
+  debounce, mismatch alerts with rollback, in-app audit entries, and
+  recommendation cards with score and WDL.
 
 ## Build
 
@@ -83,6 +87,8 @@ The APK keeps the same core behavior as the web client:
 - During the delay, changing red/black AI settings or disabling automatic
   delegated moves affects the next decision.
 - Chinese and UCI notation can be switched in the analysis panel.
+- The analysis panel mirrors the web information model: mainline depth/nps/nodes,
+  up to 5 MultiPV recommendations, score, WDL, audit count, and move history.
 
 ## Engine Parser Test
 
@@ -102,9 +108,6 @@ WDL shape.
 
 ## Remaining Gaps
 
-- The APK still lacks the web audit-log panel, but the local backend now uses
-  the same analysis model, MultiPV behavior, and positionId-style stale-result
-  protection.
 - APK legal-move generation covers normal movement, blocking, flying general,
   and self-check filtering, but tournament repetition/perpetual-check rules are
   still not implemented.

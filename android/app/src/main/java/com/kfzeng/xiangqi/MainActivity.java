@@ -1,8 +1,11 @@
 package com.kfzeng.xiangqi;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Dialog;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
@@ -22,7 +25,9 @@ import com.kfzeng.xiangqi.engine.SearchLimit;
 import com.kfzeng.xiangqi.ui.BoardView;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 
 public class MainActivity extends Activity {
     interface ToggleSetter { void set(boolean value); }
@@ -38,6 +43,7 @@ public class MainActivity extends Activity {
     private TextView redWdl;
     private TextView drawWdl;
     private TextView blackWdl;
+    private TextView engineStatusText;
     private TextView turnStat;
     private TextView roundStat;
     private TextView redClock;
@@ -47,6 +53,18 @@ public class MainActivity extends Activity {
     private Button manualAiButton;
     private ApkBackend backend;
     private AnalysisResult lastAnalysis;
+    private String lastAnalysisKey = "";
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
+    private final LinkedHashMap<String, Runnable> pendingProtectedActions = new LinkedHashMap<>();
+    private final ArrayList<String> auditLogs = new ArrayList<>();
+    private Runnable autoRunnable;
+    private Runnable undoRunnable;
+    private long redClockMs = 0;
+    private long blackClockMs = 0;
+    private long lastClockTick = System.currentTimeMillis();
+    private int generation = 0;
+    private int mismatchCount = 0;
+    private boolean pendingAnalysisAfterBusy = false;
     private boolean autoMode = true;
     private boolean redAi = false;
     private boolean blackAi = true;
@@ -59,7 +77,7 @@ public class MainActivity extends Activity {
     private String blackSearchMode = "depth";
     private int blackMoveTimeMs = 2000;
     private int blackDepth = 16;
-    private int delegateDelayMs = 1000;
+    private int delegateDelayMs = 2000;
     private boolean notationUci = false;
 
     @Override
@@ -75,6 +93,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        uiHandler.removeCallbacksAndMessages(null);
         if (backend != null) backend.close();
         super.onDestroy();
     }
@@ -108,14 +127,14 @@ public class MainActivity extends Activity {
         top.addView(analysis, analysisLp);
         root.addView(top);
 
-        TextView engineStatus = text("● 离线 APK · Pikafish 20260628 arm64", 13, 0xff287f83, false);
-        engineStatus.setGravity(Gravity.CENTER_VERTICAL);
-        engineStatus.setPadding(dp(10), 0, dp(10), 0);
-        engineStatus.setBackground(makeRound(0xffffffff, 0xffd2c7b8, dp(18)));
+        engineStatusText = text("● Pikafish ready", 13, 0xff287f83, false);
+        engineStatusText.setGravity(Gravity.CENTER_VERTICAL);
+        engineStatusText.setPadding(dp(10), 0, dp(10), 0);
+        engineStatusText.setBackground(makeRound(0xffffffff, 0xffd2c7b8, dp(18)));
         LinearLayout.LayoutParams engineLp = new LinearLayout.LayoutParams(-1, dp(30));
         engineLp.leftMargin = dp(10);
         engineLp.rightMargin = dp(10);
-        root.addView(engineStatus, engineLp);
+        root.addView(engineStatusText, engineLp);
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(false);
@@ -155,7 +174,9 @@ public class MainActivity extends Activity {
         boardShell.addView(wdlGrid, wdlLp);
 
         boardView = new BoardView(this, game);
+        boardView.setMoveGuard(() -> !engineBusy && (("red".equals(game.sideToMove()) && !redAi) || ("black".equals(game.sideToMove()) && !blackAi)));
         boardView.setMoveListener(() -> {
+            onPositionChangedByMove();
             refreshUi();
             analyzePosition(false);
         });
@@ -179,12 +200,14 @@ public class MainActivity extends Activity {
         delegated.setPadding(0, dp(6), 0, 0);
         autoButton = actionButton("自动代走：开", 0xffc7352d);
         autoButton.setOnClickListener(v -> {
-            autoMode = !autoMode;
-            refreshUi();
-            maybeAutoMove();
+            runProtectedAction("auto-mode", () -> {
+                autoMode = !autoMode;
+                refreshUi();
+                scheduleAutoIfNeeded();
+            });
         });
         manualAiButton = actionButton("本步 AI", 0xff287f83);
-        manualAiButton.setOnClickListener(v -> playAiMove());
+        manualAiButton.setOnClickListener(v -> runProtectedAction("manual-ai", this::playAiMove));
         delegated.addView(autoButton, new LinearLayout.LayoutParams(0, dp(42), 1));
         LinearLayout.LayoutParams manualLp = new LinearLayout.LayoutParams(0, dp(42), 1);
         manualLp.leftMargin = dp(8);
@@ -205,16 +228,28 @@ public class MainActivity extends Activity {
         boardShell.addView(stats);
 
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        startClockTicker();
         return root;
     }
 
     private void showConfigDialog() {
         Dialog dialog = sideDialog(Gravity.START, "对局配置");
         LinearLayout body = dialog.findViewById(1001);
-        body.addView(toggleRow("红方", "AI", redAi, value -> { redAi = value; refreshUi(); maybeAutoMove(); }));
-        body.addView(toggleRow("黑方", "AI", blackAi, value -> { blackAi = value; refreshUi(); maybeAutoMove(); }));
+        body.addView(toggleRow("红方", "AI", redAi, value -> runProtectedAction("player-red", () -> {
+            redAi = value;
+            refreshUi();
+            scheduleAutoIfNeeded();
+        })));
+        body.addView(toggleRow("黑方", "AI", blackAi, value -> runProtectedAction("player-black", () -> {
+            blackAi = value;
+            refreshUi();
+            scheduleAutoIfNeeded();
+        })));
         body.addView(sliderRow("代走间隔", "分析完成后至少等待", 0, 5000, 500, delegateDelayMs, value -> {
-            delegateDelayMs = value;
+            runProtectedAction("delay", () -> {
+                delegateDelayMs = value;
+                scheduleAutoIfNeeded();
+            });
             return String.format(Locale.US, "%.1fs", value / 1000f);
         }));
         body.addView(aiSearchCard("red", "红方 AI 搜索", () -> {
@@ -237,10 +272,11 @@ public class MainActivity extends Activity {
             showAnalysisDialog();
         }));
         body.addView(analysisCard("当前结论", analysisSummary, 0xff287f83, true));
-        body.addView(analysisCard("主变", lastAnalysis == null ? "正在分析" : lastAnalysis.pvText(notationUci), 0xff8b5b28, false));
+        body.addView(analysisCard("主变", mainLineText(), 0xff8b5b28, false));
         body.addView(recommendationsSection());
+        body.addView(analysisCard("代走审计", auditText(), mismatchCount > 0 ? 0xffc7352d : 0xff766b5f, false));
         body.addView(analysisCard("走法记录", game.movesText(notationUci), 0xff4b433a, false));
-        body.addView(analysisCard("说明", "分数始终按红方视角显示：红方 +0.24 表示红方略优，黑方 +0.24 表示黑方略优。WDL 为红胜、和棋、黑胜。", 0xff766b5f, false));
+        body.addView(analysisCard("说明", "bestmove 是引擎建议的当前一步；pv 是按该步继续推演的主变。中文模式展示用户记谱，UCI 模式展示引擎坐标。score 正数为红方优势，WDL 依次为红胜、和棋、黑胜。", 0xff766b5f, false));
         dialog.show();
     }
 
@@ -302,6 +338,7 @@ public class MainActivity extends Activity {
         View.OnClickListener listener = v -> {
             notationUci = v == uci;
             renderAnalysisText();
+            refreshUi();
             redraw.run();
         };
         readable.setOnClickListener(listener);
@@ -364,7 +401,7 @@ public class MainActivity extends Activity {
                 section.addView(recommendationCard(
                         i + 1,
                         line.moveText(notationUci),
-                        line.scoreText.isEmpty() ? "等待分数" : line.scoreText,
+                        recommendationEval(line),
                         line.pvText(notationUci)));
             }
         }
@@ -373,6 +410,12 @@ public class MainActivity extends Activity {
         lp.bottomMargin = dp(9);
         section.setLayoutParams(lp);
         return section;
+    }
+
+    private String recommendationEval(AnalysisLine line) {
+        String score = line.scoreText.isEmpty() ? "等待分数" : line.scoreText;
+        if (line.wdl == null) return score;
+        return score + "\nWDL " + line.wdl[0] + "/" + line.wdl[1] + "/" + line.wdl[2];
     }
 
     private View recommendationCard(int rank, String move, String score, String pv) {
@@ -401,8 +444,8 @@ public class MainActivity extends Activity {
 
         TextView eval = text(score == null || score.isEmpty() ? "无分数" : score, 12, rank == 1 ? 0xffc7352d : 0xff4b433a, true);
         eval.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        eval.setSingleLine(true);
-        card.addView(eval, new LinearLayout.LayoutParams(dp(86), dp(44)));
+        eval.setLineSpacing(dp(1), 1.0f);
+        card.addView(eval, new LinearLayout.LayoutParams(dp(94), dp(48)));
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.topMargin = dp(7);
@@ -473,9 +516,11 @@ public class MainActivity extends Activity {
         card.addView(header);
 
         card.addView(modeTabs(mode, red ? 0xffc7352d : 0xff282522, selected -> {
-            if (red) redSearchMode = selected;
-            else blackSearchMode = selected;
-            redraw.run();
+            runProtectedAction("ai-mode-" + side, () -> {
+                if (red) redSearchMode = selected;
+                else blackSearchMode = selected;
+                redraw.run();
+            });
         }));
 
         TextView command = text(limit.goCommand(), 11, 0xff766b5f, false);
@@ -486,19 +531,23 @@ public class MainActivity extends Activity {
             card.addView(compactSlider("depth " + depth, "固定搜索深度", 1, 30, 1, depth,
                     next -> "depth " + next,
                     next -> {
-                        if (red) redDepth = next;
-                        else blackDepth = next;
-                        command.setText(searchLimit(side).goCommand());
-                        value.setText(searchLimit(side).label());
+                        runProtectedAction("ai-range-" + side, () -> {
+                            if (red) redDepth = next;
+                            else blackDepth = next;
+                            command.setText(searchLimit(side).goCommand());
+                            value.setText(searchLimit(side).label());
+                        });
                     }));
         } else {
             card.addView(compactSlider(String.format(Locale.US, "%.1fs", movetime / 1000f), "每步搜索时间", 100, 30000, 100, movetime,
                     next -> String.format(Locale.US, "%.1fs", next / 1000f),
                     next -> {
-                        if (red) redMoveTimeMs = next;
-                        else blackMoveTimeMs = next;
-                        command.setText(searchLimit(side).goCommand());
-                        value.setText(searchLimit(side).label());
+                        runProtectedAction("ai-range-" + side, () -> {
+                            if (red) redMoveTimeMs = next;
+                            else blackMoveTimeMs = next;
+                            command.setText(searchLimit(side).goCommand());
+                            value.setText(searchLimit(side).label());
+                        });
                     }));
         }
 
@@ -599,23 +648,34 @@ public class MainActivity extends Activity {
     }
 
     private void newGame() {
+        clearTimers();
+        pendingProtectedActions.clear();
         analysisSerial++;
+        generation++;
         game.reset();
-        lastAnalysis = null;
-        analysisSummary = "等待重新分析。";
+        resetAnalysis();
+        redClockMs = 0;
+        blackClockMs = 0;
+        lastClockTick = System.currentTimeMillis();
+        mismatchCount = 0;
+        auditLogs.clear();
+        addAudit("新局", false);
         boardView.clearSelection();
         refreshUi();
         analyzePosition(false);
     }
 
     private void undo() {
+        clearAutoTimer();
+        if (game.moves.isEmpty()) return;
         analysisSerial++;
+        generation++;
         game.undo();
-        lastAnalysis = null;
-        analysisSummary = "等待重新分析。";
+        resetAnalysis();
+        addAudit("悔棋", false);
         boardView.clearSelection();
         refreshUi();
-        analyzePosition(false);
+        scheduleUndoAnalysis();
     }
 
     private void flip() {
@@ -624,32 +684,52 @@ public class MainActivity extends Activity {
     }
 
     private void playAiMove() {
-        if (!engineBusy) analyzePosition(true);
+        if (engineBusy) {
+            runProtectedAction("manual-ai", this::playAiMove);
+            return;
+        }
+        if (game.legalMoves().isEmpty()) return;
+        if (lastAnalysis == null || !lastAnalysisKey.equals(movesKey())) {
+            analyzePosition(false);
+            runProtectedAction("manual-ai", this::playAiMove);
+            return;
+        }
+        applyBestMoveFromAnalysis(false, new ArrayList<>(game.moves), generation);
     }
 
     private void analyzePosition(boolean playBestMove) {
-        if (engineBusy) return;
+        if (engineBusy) {
+            pendingAnalysisAfterBusy = true;
+            return;
+        }
+        if (game.legalMoves().isEmpty()) {
+            resetAnalysis();
+            renderWdl(null);
+            return;
+        }
         final int serial = ++analysisSerial;
         final ArrayList<String> moves = new ArrayList<>(game.moves);
+        final String requestKey = movesKey(moves);
         final String requestPositionId = backend.positionId(moves);
+        final int requestGeneration = generation;
         engineBusy = true;
-        thinkingText.setText(playBestMove ? "代走" : "分析");
-        manualAiButton.setEnabled(false);
-        autoButton.setEnabled(false);
+        thinkingText.setText("思考中");
+        engineStatusText.setText("● Pikafish thinking");
         analysisSummary = "Pikafish 正在计算...";
         final SearchLimit limit = searchLimit(moves.size() % 2 == 0 ? "red" : "black");
         new Thread(() -> {
             try {
                 AnalysisResult result = backend.analyze(moves, limit);
-                runOnUiThread(() -> applyAnalysis(serial, requestPositionId, result, playBestMove));
+                runOnUiThread(() -> applyAnalysis(serial, requestGeneration, requestKey, requestPositionId, result, playBestMove));
             } catch (Exception ex) {
                 runOnUiThread(() -> {
                     if (serial != analysisSerial) return;
                     engineBusy = false;
                     thinkingText.setText("异常");
-                    manualAiButton.setEnabled(true);
-                    autoButton.setEnabled(true);
+                    engineStatusText.setText("● " + ex.getMessage());
                     analysisSummary = "分析失败：" + ex.getMessage();
+                    if (isMismatchError(ex.getMessage())) handleMismatch(ex.getMessage(), moves);
+                    flushProtectedActions();
                 });
             }
         }).start();
@@ -662,33 +742,184 @@ public class MainActivity extends Activity {
         return SearchLimit.movetime(red ? redMoveTimeMs : blackMoveTimeMs);
     }
 
-    private void applyAnalysis(int serial, String requestPositionId, AnalysisResult result, boolean playBestMove) {
+    private void onPositionChangedByMove() {
+        clearTimers();
+        generation++;
+        resetAnalysis();
+    }
+
+    private void resetAnalysis() {
+        lastAnalysis = null;
+        lastAnalysisKey = "";
+        analysisSummary = "等待重新分析。";
+        renderWdl(null);
+    }
+
+    private String movesKey() {
+        return movesKey(game.moves);
+    }
+
+    private String movesKey(ArrayList<String> moves) {
+        return String.join(" ", moves);
+    }
+
+    private void runProtectedAction(String key, Runnable action) {
+        pendingProtectedActions.put(key, action);
+        if (!engineBusy) flushProtectedActions();
+    }
+
+    private void flushProtectedActions() {
+        if (engineBusy) return;
+        while (!engineBusy && !pendingProtectedActions.isEmpty()) {
+            Map.Entry<String, Runnable> entry = pendingProtectedActions.entrySet().iterator().next();
+            pendingProtectedActions.remove(entry.getKey());
+            entry.getValue().run();
+        }
+    }
+
+    private void scheduleUndoAnalysis() {
+        if (undoRunnable != null) uiHandler.removeCallbacks(undoRunnable);
+        undoRunnable = () -> {
+            undoRunnable = null;
+            analyzePosition(false);
+        };
+        uiHandler.postDelayed(undoRunnable, 500);
+    }
+
+    private void clearTimers() {
+        clearAutoTimer();
+        if (undoRunnable != null) {
+            uiHandler.removeCallbacks(undoRunnable);
+            undoRunnable = null;
+        }
+    }
+
+    private void clearAutoTimer() {
+        if (autoRunnable != null) {
+            uiHandler.removeCallbacks(autoRunnable);
+            autoRunnable = null;
+        }
+    }
+
+    private void handleMismatch(String message, ArrayList<String> restoreMoves) {
+        clearTimers();
+        pendingProtectedActions.clear();
+        autoMode = false;
+        mismatchCount++;
+        addAudit(message, true);
+        game.restore(restoreMoves);
+        generation++;
+        resetAnalysis();
+        boardView.clearSelection();
+        thinkingText.setText("不匹配");
+        engineStatusText.setText("● mismatch");
+        refreshUi();
+        analyzePosition(false);
+        new AlertDialog.Builder(this)
+                .setTitle("检测到代走不匹配")
+                .setMessage(message + "\n\n已关闭自动代走，并回到触发检查时的局面。")
+                .setPositiveButton("知道了", null)
+                .show();
+    }
+
+    private boolean isMismatchError(String message) {
+        if (message == null) return false;
+        String lower = message.toLowerCase(Locale.US);
+        return lower.contains("positionid") || lower.contains("illegal") || lower.contains("bestmove") || message.contains("不匹配");
+    }
+
+    private void addAudit(String message, boolean mismatch) {
+        String item = (mismatch ? "!" : "-") + " " + message;
+        auditLogs.add(0, item);
+        while (auditLogs.size() > 8) auditLogs.remove(auditLogs.size() - 1);
+    }
+
+    private String auditText() {
+        if (auditLogs.isEmpty()) return "不匹配 " + mismatchCount + "\n暂无记录";
+        return "不匹配 " + mismatchCount + "\n" + String.join("\n", auditLogs);
+    }
+
+    private String mainLineText() {
+        if (lastAnalysis == null || lastAnalysis.lines.isEmpty()) return engineBusy ? "正在分析" : "未分析";
+        AnalysisLine best = lastAnalysis.lines.get(0);
+        String meta = "depth " + (best.depth > 0 ? best.depth : "-") + " / nps " + (best.nps > 0 ? best.nps : "-") + " / nodes " + best.nodes;
+        return meta + "\n" + best.pvText(notationUci);
+    }
+
+    private void renderWdl(int[] wdl) {
+        if (wdl == null) {
+            redWdl.setText("红胜 -");
+            drawWdl.setText("和棋 -");
+            blackWdl.setText("黑胜 -");
+            return;
+        }
+        redWdl.setText("红胜 " + Math.round(wdl[0] / 10f) + "%");
+        drawWdl.setText("和棋 " + Math.round(wdl[1] / 10f) + "%");
+        blackWdl.setText("黑胜 " + Math.round(wdl[2] / 10f) + "%");
+    }
+
+    private void startClockTicker() {
+        lastClockTick = System.currentTimeMillis();
+        uiHandler.postDelayed(new Runnable() {
+            @Override public void run() {
+                long now = System.currentTimeMillis();
+                long elapsed = now - lastClockTick;
+                lastClockTick = now;
+                if (!game.legalMoves().isEmpty()) {
+                    if ("red".equals(game.sideToMove())) redClockMs += elapsed;
+                    else blackClockMs += elapsed;
+                    refreshClocks();
+                }
+                uiHandler.postDelayed(this, 500);
+            }
+        }, 500);
+    }
+
+    private void refreshClocks() {
+        redClock.setText("红方用时\n" + formatClock(redClockMs));
+        blackClock.setText("黑方用时\n" + formatClock(blackClockMs));
+    }
+
+    private String formatClock(long ms) {
+        long totalSeconds = Math.max(0, ms / 1000);
+        long minutes = totalSeconds / 60;
+        long seconds = totalSeconds % 60;
+        return String.format(Locale.US, "%02d:%02d", minutes, seconds);
+    }
+
+    private void applyAnalysis(int serial, int requestGeneration, String requestKey, String requestPositionId, AnalysisResult result, boolean playBestMove) {
         if (serial != analysisSerial) return;
+        if (requestGeneration != generation || !movesKey().equals(requestKey)) {
+            engineBusy = false;
+            addAudit("丢弃过期分析", false);
+            flushProtectedActions();
+            if (pendingAnalysisAfterBusy) {
+                pendingAnalysisAfterBusy = false;
+                analyzePosition(false);
+            }
+            return;
+        }
         if (!backend.positionId(game.moves).equals(requestPositionId)) {
             engineBusy = false;
-            autoMode = false;
-            analysisSummary = "分析局面不匹配，已关闭自动代走。";
-            thinkingText.setText("不匹配");
-            manualAiButton.setEnabled(true);
-            autoButton.setEnabled(true);
-            refreshUi();
+            handleMismatch("分析 positionId 不匹配", new ArrayList<>(game.moves));
+            flushProtectedActions();
             return;
         }
         engineBusy = false;
         lastAnalysis = result.withChinese(game.boardSnapshot());
-        if (result.wdl != null) {
-            redWdl.setText("红胜 " + result.wdl[0]);
-            drawWdl.setText("和棋 " + result.wdl[1]);
-            blackWdl.setText("黑胜 " + result.wdl[2]);
-        }
+        lastAnalysisKey = requestKey;
+        renderWdl(lastAnalysis.wdl);
         renderAnalysisText();
-        if (playBestMove || shouldAutoPlayCurrentSide()) {
-            if (scheduleBestMove(serial, result.bestMove, !playBestMove)) return;
-        }
         thinkingText.setText("待命");
-        manualAiButton.setEnabled(true);
-        autoButton.setEnabled(true);
+        engineStatusText.setText("● Pikafish ready");
         refreshUi();
+        flushProtectedActions();
+        if (playBestMove) applyBestMoveFromAnalysis(false, new ArrayList<>(game.moves), generation);
+        else scheduleAutoIfNeeded();
+        if (pendingAnalysisAfterBusy) {
+            pendingAnalysisAfterBusy = false;
+            analyzePosition(false);
+        }
     }
 
     private void renderAnalysisText() {
@@ -697,10 +928,7 @@ public class MainActivity extends Activity {
     }
 
     private void maybeAutoMove() {
-        if (!autoMode || engineBusy || game.legalMoves().isEmpty()) return;
-        if (shouldAutoPlayCurrentSide()) {
-            analyzePosition(true);
-        }
+        scheduleAutoIfNeeded();
     }
 
     private boolean shouldAutoPlayCurrentSide() {
@@ -708,35 +936,47 @@ public class MainActivity extends Activity {
         return autoMode && (("red".equals(side) && redAi) || ("black".equals(side) && blackAi));
     }
 
-    private boolean scheduleBestMove(int serial, String bestMove, boolean requireAutoCheck) {
-        if (bestMove == null || bestMove.length() != 4) return false;
-        if (!game.legalMoves().contains(bestMove)) {
-            analysisSummary = "AI 返回不合法着法，已停止代走：" + bestMove;
-            autoMode = false;
-            refreshUi();
-            return false;
-        }
+    private void scheduleAutoIfNeeded() {
+        clearAutoTimer();
+        if (!autoMode || engineBusy || lastAnalysis == null || !lastAnalysisKey.equals(movesKey())) return;
+        if (!shouldAutoPlayCurrentSide() || game.legalMoves().isEmpty()) return;
+        final int requestGeneration = generation;
+        final String requestSide = game.sideToMove();
+        final ArrayList<String> requestMoves = new ArrayList<>(game.moves);
         thinkingText.setText("等待");
-        manualAiButton.setEnabled(true);
-        autoButton.setEnabled(true);
         refreshUi();
-        boardView.postDelayed(() -> {
-            if (engineBusy || serial != analysisSerial) return;
-            if (requireAutoCheck && !shouldAutoPlayCurrentSide()) {
+        autoRunnable = () -> {
+            if (engineBusy || requestGeneration != generation || !requestSide.equals(game.sideToMove())) return;
+            if (!autoMode || !shouldAutoPlayCurrentSide()) {
                 thinkingText.setText("待命");
-                manualAiButton.setEnabled(true);
-                autoButton.setEnabled(true);
                 refreshUi();
                 return;
             }
-            game.applyMove(bestMove);
-            boardView.clearSelection();
-            lastAnalysis = null;
-            analysisSummary = "等待重新分析。";
-            refreshUi();
-            analyzePosition(false);
-        }, delegateDelayMs);
-        return true;
+            applyBestMoveFromAnalysis(true, requestMoves, requestGeneration);
+        };
+        uiHandler.postDelayed(autoRunnable, delegateDelayMs);
+    }
+
+    private void applyBestMoveFromAnalysis(boolean requireAutoCheck, ArrayList<String> requestMoves, int requestGeneration) {
+        if (lastAnalysis == null || !lastAnalysisKey.equals(movesKey())) return;
+        String bestMove = lastAnalysis.bestMove;
+        if (bestMove == null || bestMove.length() != 4) return;
+        if (requestGeneration != generation || !requestMoves.equals(game.moves)) {
+            addAudit("代走任务过期", false);
+            return;
+        }
+        if (requireAutoCheck && !shouldAutoPlayCurrentSide()) return;
+        if (!backend.positionId(game.moves).equals(backend.positionId(requestMoves)) || !game.legalMoves().contains(bestMove)) {
+            handleMismatch("bestmove 审核失败，重新分析", requestMoves);
+            return;
+        }
+        addAudit("代走 " + bestMove, false);
+        clearAutoTimer();
+        game.applyMove(bestMove);
+        onPositionChangedByMove();
+        boardView.clearSelection();
+        refreshUi();
+        analyzePosition(false);
     }
 
     private void refreshUi() {
@@ -745,19 +985,16 @@ public class MainActivity extends Activity {
         moveCountText.setText(game.moves.size() + " 步");
         if (!engineBusy) thinkingText.setText("待命");
         if (lastAnalysis == null || lastAnalysis.wdl == null) {
-            redWdl.setText("红胜 -");
-            drawWdl.setText("和棋 -");
-            blackWdl.setText("黑胜 -");
+            renderWdl(null);
         }
         turnStat.setText("当前方\n" + sideName);
-        roundStat.setText("回合数\n" + (game.moves.size() + 1) / 2);
-        redClock.setText("红方用时\n--:--");
-        blackClock.setText("黑方用时\n--:--");
+        roundStat.setText("回合数\n" + game.moves.size());
+        refreshClocks();
         autoButton.setText(autoMode ? "自动代走：开" : "自动代走：关");
         autoButton.setTextColor(autoMode ? 0xffffffff : 0xff29241f);
         autoButton.setBackground(makeRound(autoMode ? 0xffc7352d : 0xffffffff, autoMode ? 0xff9e322d : 0xffd2c7b8, dp(7)));
-        manualAiButton.setEnabled(!engineBusy);
-        autoButton.setEnabled(!engineBusy);
+        manualAiButton.setEnabled(!game.legalMoves().isEmpty());
+        autoButton.setEnabled(true);
         boardView.invalidate();
     }
 

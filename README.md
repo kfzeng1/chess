@@ -15,6 +15,7 @@ android/
 docs/
   ARCHITECTURE.md        # module and data-flow notes
   MOBILE_MIGRATION.md    # Android APK and mobile notes
+  WEB_TO_ANDROID_PARITY.md # web UI/API parity checklist for APK work
   WEB_APP.md             # web app API and run notes
 engines/
   pikafish-avxvnni       # Pikafish Linux x86-64 AVX-VNNI binary
@@ -60,6 +61,10 @@ The APK currently includes:
 - Red/black AI strength controls match the web app: each side supports
   `go movetime <ms>` and `go depth <plies>` with the exact UCI command shown in
   the configuration drawer.
+- Web-parity behavior includes WDL percentages, live red/black clocks,
+  protected control actions while analysis is running, 0.5s undo analysis
+  debounce, mismatch alerts, audit entries, and recommendation cards with score
+  and WDL.
 - Mobile layout mirrors the web mobile preview: top configuration/analysis
   actions, large board-first play area, bottom quick actions, status cards, and
   side drawers for configuration and analysis.
@@ -168,6 +173,7 @@ make clean
 More details: [docs/WEB_APP.md](docs/WEB_APP.md).
 Architecture notes: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 Mobile migration notes: [docs/MOBILE_MIGRATION.md](docs/MOBILE_MIGRATION.md).
+APK parity notes: [docs/WEB_TO_ANDROID_PARITY.md](docs/WEB_TO_ANDROID_PARITY.md).
 
 ## Regenerate Assets
 

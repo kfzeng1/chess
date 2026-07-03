@@ -17,6 +17,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class BoardView extends View {
+    public interface MoveGuard { boolean canMove(); }
+
     public static final float CROP_LEFT = 120f;
     public static final float CROP_TOP = 120f;
     public static final float CROP_RIGHT = 1680f;
@@ -30,6 +32,7 @@ public class BoardView extends View {
     private String selected;
     private boolean flipped;
     private Runnable moveListener;
+    private MoveGuard moveGuard;
 
     public BoardView(Activity activity, GameState game) {
         super(activity);
@@ -50,6 +53,10 @@ public class BoardView extends View {
 
     public void setMoveListener(Runnable listener) {
         moveListener = listener;
+    }
+
+    public void setMoveGuard(MoveGuard guard) {
+        moveGuard = guard;
     }
 
     public void setFlipped(boolean value) {
@@ -83,6 +90,19 @@ public class BoardView extends View {
         paint.setColor(0xffd2c7b8);
         canvas.drawRoundRect(dst, 4, 4, paint);
         paint.setStyle(Paint.Style.FILL);
+        if (game.lastMove != null && game.lastMove.length() == 4) {
+            drawMarker(canvas, game.lastMove.substring(0, 2), w, h, drawW * 0.055f, 0xffa86b25);
+            drawMarker(canvas, game.lastMove.substring(2, 4), w, h, drawW * 0.055f, 0xff287f83);
+        }
+        if (selected != null) {
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(0xcc287f83);
+            for (String move : game.legalMoves()) {
+                if (!move.startsWith(selected)) continue;
+                float[] xy = point(move.substring(2, 4), w, h);
+                canvas.drawCircle(xy[0], xy[1], drawW * 0.016f, paint);
+            }
+        }
         for (Map.Entry<String, Piece> entry : game.board.entrySet()) {
             float[] xy = point(entry.getKey(), w, h);
             float size = drawW * 0.095f;
@@ -98,8 +118,18 @@ public class BoardView extends View {
         }
     }
 
+    private void drawMarker(Canvas canvas, String square, float w, float h, float radius, int color) {
+        float[] xy = point(square, w, h);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(4);
+        paint.setColor(color);
+        canvas.drawCircle(xy[0], xy[1], radius, paint);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
     @Override public boolean onTouchEvent(MotionEvent event) {
         if (event.getAction() != MotionEvent.ACTION_UP) return true;
+        if (moveGuard != null && !moveGuard.canMove()) return true;
         String square = nearestSquare(event.getX(), event.getY(), getWidth(), getHeight());
         Piece piece = game.board.get(square);
         if (selected == null) {

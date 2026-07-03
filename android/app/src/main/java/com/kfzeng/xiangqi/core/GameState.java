@@ -48,6 +48,11 @@ public class GameState {
         lastMove = moves.isEmpty() ? null : moves.get(moves.size() - 1);
     }
 
+    public void restore(List<String> targetMoves) {
+        reset();
+        for (String move : targetMoves) applyMove(move);
+    }
+
     public Map<String, Piece> boardSnapshot() {
         return copyBoard(board);
     }
